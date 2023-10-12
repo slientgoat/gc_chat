@@ -1,0 +1,26 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the README at:
+// https://github.com/microsoft/vscode-dev-containers/tree/v0.245.2/containers/docker-existing-dockerfile
+{
+	"name": "M1x_Dev_Container",
+	"dockerComposeFile": "docker-compose.yml",
+	"service": "devcontainer",
+	"workspaceFolder": "/ws/${localWorkspaceFolderBasename}",
+	"customizations": {
+		// Configure properties specific to VS Code.
+		"vscode": {
+			// Add the IDs of extensions you want installed when the container is created.
+			"extensions": [
+				"jakebecker.elixir-ls",
+				"ms-azuretools.vscode-docker",
+				"eamodio.gitlens",
+				"streetsidesoftware.code-spell-checker",
+				"redhat.vscode-yaml"
+			]
+		},
+		"settings": {
+			"terminal.integrated.defaultProfile.linux": "zsh",
+			"terminal.integrated.shell.linux": "/bin/zsh"
+		}
+	},
+	"postStartCommand": "sh .devcontainer/post-start.sh"
+}
