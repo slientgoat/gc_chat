@@ -1,0 +1,8 @@
+Name                                            ips        average  deviation         median         99th %
+local lookup newest 500 msgs               220.74 K        4.53 μs   ±204.35%        4.01 μs       23.98 μs
+local lookup newest 1 msgs                 194.40 K        5.14 μs   ±186.69%        4.57 μs       25.02 μs
+LocalCache.lookup newest 500 msgs          181.47 K        5.51 μs   ±142.31%        4.74 μs       29.57 μs
+rpc.block_call lookup newest 1 msgs         20.91 K       47.83 μs    ±45.89%       45.13 μs      151.88 μs
+rpc.call lookup newest 1 msgs               16.74 K       59.74 μs    ±38.56%       55.91 μs      166.88 μs
+GCChat.Handler.lookup newest 500 msgs       10.56 K       94.73 μs    ±62.53%       86.06 μs      266.34 μs
+HordeCache.lookup newest 500 msgs           10.09 K       99.06 μs    ±53.69%       88.75 μs      278.81 μs

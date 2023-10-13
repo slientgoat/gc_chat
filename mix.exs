@@ -40,6 +40,7 @@ defmodule GCChat.MixProject do
       {:shards, "~> 1.0"},
       {:decorator, "~> 1.4"},
       {:telemetry, "~> 1.0"},
+      {:nebulex_adapters_horde, "~> 1.0"},
       {:benchee, "~> 1.1", only: [:dev, :test]},
       {:local_cluster, "~> 1.2", only: [:test]},
       {:mix_test_watch, "~> 1.1", only: :dev, runtime: false}

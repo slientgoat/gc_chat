@@ -1,24 +1,33 @@
-# Benchee.run(
-#   %{
-#     "deliver" => fn ->
-#       SimpleHandler.deliver(
-#         SimpleHandler.build_personal_message(%{
-#           cfg_id: 1,
-#           from: 123,
-#           to: System.unique_integer([:positive])
-#         })
-#         |> elem(1)
-#       )
-#     end,
-#     "pull_global_ids" => fn ->
-#       SimpleHandler.pull_message_ids(1, 1)
-#     end
-#   },
-#   formatters: [
-#     {Benchee.Formatters.Console, comparison: false, extended_statistics: true}
-#     # {Benchee.Formatters.HTML, extended_statistics: true, auto_open: false}
-#   ],
-#   print: [
-#     fast_warning: false
-#   ]
-# )
+:ok = LocalCluster.start()
+[n1 | _] = LocalCluster.start_nodes("gc-chat-cluster", 2)
+
+IO.puts("Nodes connected count #{Node.list() |> Enum.count()}")
+IO.puts("---------------------------------------------------")
+
+channel = "public"
+buffer = GCChat.Server.create_buffer(1000)
+GCChat.HordeCache.put(channel, buffer)
+Process.sleep(1000)
+GCChat.HordeCache.get(channel) |> IO.inspect(label: "HordeCache")
+
+GCChat.LocalCache.put(channel, buffer)
+GCChat.LocalCache.get(channel) |> IO.inspect(label: "LocalCache")
+
+hander_pid = GCChat.Handler.via_tuple(GCChat.Handler) |> GenServer.whereis()
+
+node(hander_pid) |> IO.inspect(label: "GCChat.Handler.Node")
+
+Benchee.run(%{
+  "local lookup newest 500 msgs" => fn -> GCChat.lookup(500) end,
+  "local lookup newest 500 msgs" => fn -> GCChat.lookup(500) end,
+  "rpc.block_call lookup newest 500 msgs" => fn ->
+    :rpc.block_call(n1, GCChat, :lookup, [500])
+  end,
+  "rpc.call lookup newest 500 msgs" => fn -> :rpc.call(n1, GCChat, :lookup, [500]) end,
+  "HordeCache.lookup newest 500 msgs" => fn -> GCChat.HordeCache.lookup(channel, 500) end,
+  "LocalCache.lookup newest 500 msgs" => fn -> GCChat.LocalCache.lookup(channel, 500) end,
+  "GCChat.Router.lookup newest 500 msgs" => fn -> GCChat.Router.lookup(channel, 500) end,
+  "GCChat.Router.lookup2 newest 500 msgs" => fn ->
+    GCChat.Router.lookup(hander_pid, channel, 500)
+  end
+})
