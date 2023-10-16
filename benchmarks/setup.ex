@@ -24,7 +24,8 @@ defmodule BenchTestApplication do
           members: :auto
         ]
       },
-      {GCChat.Server, []}
+      {GCChat.Server, []},
+      {GCChat.Manager, []}
     ]
 
     Supervisor.start_link(children, opts)

@@ -1,7 +1,7 @@
 defmodule GCChat.Channel do
   defstruct channel: nil
 
-  def start_child(mod) do
+  def start_global_service(mod) do
     case Horde.DynamicSupervisor.start_child(GCChat.DistributedSupervisor, mod) do
       {:ok, pid} ->
         {:ok, pid}
@@ -36,8 +36,8 @@ defmodule GCChat.Channel do
           GCChat.Reader
         ]
 
-        writter = GCChat.Channel.start_child(GCChat.Writter)
-        reader = GCChat.Channel.start_child(GCChat.Reader)
+        writter = GCChat.Channel.start_global_service(GCChat.GlobalService)
+        reader = GCChat.Channel.start_child({__MODULE__, GCChat.Reader})
 
         {:ok, [], {:continue, nil}}
       end
