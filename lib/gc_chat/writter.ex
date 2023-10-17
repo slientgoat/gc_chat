@@ -7,7 +7,11 @@ defmodule GCChat.Writter do
   def buffer_size(), do: @buffer_size
 
   def write(msgs) when is_list(msgs) do
-    via_tuple(__MODULE__) |> GenServer.whereis() |> write(msgs)
+    write(pid(), msgs)
+  end
+
+  def pid() do
+    via_tuple() |> GenServer.whereis()
   end
 
   def write(pid, msgs) when is_list(msgs) do
@@ -25,18 +29,8 @@ defmodule GCChat.Writter do
     }
   end
 
-  def pid() do
-    via_tuple() |> GenServer.whereis()
-  end
-
   def start_link(name) do
-    case GenServer.start_link(__MODULE__, [], name: via_tuple(name)) do
-      {:ok, pid} ->
-        {:ok, pid}
-
-      {:error, {:already_started, _pid}} ->
-        :ignore
-    end
+    GenServer.start_link(__MODULE__, [], name: via_tuple(name), hibernate_after: 100)
   end
 
   @impl true

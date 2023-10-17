@@ -6,6 +6,10 @@ defmodule GCChat.Reader do
     GenServer.call(via_tuple(__MODULE__), {:lookup, channel, i})
   end
 
+  def pid() do
+    via_tuple() |> GenServer.whereis()
+  end
+
   def child_spec(opts) do
     name = Keyword.get(opts, :name, __MODULE__)
 
@@ -18,25 +22,17 @@ defmodule GCChat.Reader do
   end
 
   def start_link(name) do
-    case GenServer.start_link(__MODULE__, [], name: via_tuple(name)) do
-      {:ok, pid} ->
-        {:ok, pid}
-
-      {:error, {:already_started, pid}} ->
-        Logger.info("already started at #{inspect(pid)}, returning :ignore")
-        :ignore
-    end
+    GenServer.start_link(__MODULE__, [], name: via_tuple(name))
   end
 
   @channel_public "public"
 
   @impl true
   def init(_args) do
-    :ets.new(__MODULE__, [:named_table, read_concurrency: true])
-    :ets.insert(__MODULE__, {@channel_public, GCChat.create_buffer(1000)})
     {:ok, nil}
   end
 
+  def via_tuple(), do: via_tuple(__MODULE__)
   def via_tuple(name), do: {:via, Horde.Registry, {GCChat.GlobalRegistry, name}}
 
   @impl true

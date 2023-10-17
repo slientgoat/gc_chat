@@ -19,7 +19,6 @@ defmodule GCChat.Server do
 
   @impl true
   def handle_continue(_, state) do
-    IO.inspect(%{node: Node.self(), pid: self()})
     {:noreply, state}
   end
 

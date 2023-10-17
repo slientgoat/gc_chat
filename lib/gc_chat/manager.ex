@@ -7,10 +7,9 @@ defmodule GCChat.Manager do
 
   @impl true
   def init(_) do
-    with {:ok, writter} <- start_global_service(GCChat.Writter),
-         {:ok, reader} <- start_global_service(GCChat.Reader) do
-      :persistent_term.put({__MODULE__, :writter}, writter)
-      :persistent_term.put({__MODULE__, :reader}, reader)
+    with true <- distributedSupervisor_started?() || {:error, :distributedSupervisor_not_start},
+         {:ok, _writter} <- start_global_service(GCChat.Writter) do
+      #  {:ok, _reader} <- start_global_service(GCChat.Reader) do
       {:ok, [], {:continue, nil}}
     else
       {:error, error} ->
@@ -21,6 +20,9 @@ defmodule GCChat.Manager do
   defp start_global_service(mod) do
     case Horde.DynamicSupervisor.start_child(GCChat.DistributedSupervisor, mod) do
       {:ok, pid} ->
+        {:ok, pid}
+
+      {:error, {:already_started, pid}} ->
         {:ok, pid}
 
       :ignore ->
@@ -34,5 +36,9 @@ defmodule GCChat.Manager do
   @impl true
   def handle_continue(nil, state) do
     {:noreply, state}
+  end
+
+  def distributedSupervisor_started?() do
+    GCChat.DistributedSupervisor |> GenServer.whereis() |> is_pid()
   end
 end

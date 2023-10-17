@@ -29,4 +29,15 @@ defmodule GCChat.TestFixtures do
     {:noreply, state} = GCChat.Writter.handle_continue(continue, state)
     %{state: state}
   end
+
+  def wait_for_writter_started() do
+    if GCChat.Writter.pid() |> is_pid() do
+      IO.puts("writter start success")
+      :ok
+    else
+      IO.puts("wait for writter start")
+      Process.sleep(100)
+      wait_for_writter_started()
+    end
+  end
 end
