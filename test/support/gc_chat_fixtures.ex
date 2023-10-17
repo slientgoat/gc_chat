@@ -23,21 +23,18 @@ defmodule GCChat.TestFixtures do
     end
   end
 
-  def create_writter(_args \\ []) do
-    opts = [id: 1, handler: SimpleHandler]
-    {:ok, state, {:continue, continue}} = GCChat.Writter.init([])
-    {:noreply, state} = GCChat.Writter.handle_continue(continue, state)
+  def create_server(_args \\ []) do
+    {:ok, state, {:continue, continue}} = GCChat.Server.init([])
+    {:noreply, state} = GCChat.Server.handle_continue(continue, state)
     %{state: state}
   end
 
-  def wait_for_writter_started() do
-    if GCChat.Writter.pid() |> is_pid() do
-      IO.puts("writter start success")
+  def wait_for_server_started(chat_type) do
+    if GCChat.Server.pid(chat_type) |> is_pid() do
       :ok
     else
-      IO.puts("wait for writter start")
       Process.sleep(100)
-      wait_for_writter_started()
+      wait_for_server_started(chat_type)
     end
   end
 end

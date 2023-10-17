@@ -22,7 +22,10 @@ defmodule GCChat.MixProject do
     end
   else
     def application do
-      []
+      [
+        mod: {Application, []},
+        extra_applications: [:logger]
+      ]
     end
   end
 
@@ -41,6 +44,7 @@ defmodule GCChat.MixProject do
       {:decorator, "~> 1.4"},
       {:telemetry, "~> 1.0"},
       {:nebulex_adapters_horde, "~> 1.0"},
+      {:nimble_options, "~> 1.0"},
       {:benchee, "~> 1.1", only: [:dev, :test]},
       {:local_cluster, "~> 1.2", only: [:test]},
       {:mix_test_watch, "~> 1.1", only: :dev, runtime: false}
