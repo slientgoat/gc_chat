@@ -13,6 +13,7 @@ defmodule GCChat.MixProject do
   end
 
   # Run "mix help compile.app" to learn about applications.
+
   if Mix.env() == :test do
     def application do
       [

@@ -24,7 +24,7 @@ defmodule GCChat.TestFixtures do
   end
 
   def create_server(_args \\ []) do
-    {:ok, state, {:continue, continue}} = GCChat.Server.init([])
+    {:ok, state, {:continue, continue}} = GCChat.Server.init(chat_type: BenchTest.Global)
     {:noreply, state} = GCChat.Server.handle_continue(continue, state)
     %{state: state}
   end

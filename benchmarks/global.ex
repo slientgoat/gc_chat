@@ -1,3 +1,3 @@
 defmodule BenchTest.Global do
-  use GCChat
+  use GCChat, cache_adapter: GCChat.CacheAdapter.Replicated
 end

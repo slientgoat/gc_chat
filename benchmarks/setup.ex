@@ -12,8 +12,6 @@ defmodule BenchTestApplication do
     opts = [strategy: :one_for_one, name: BenchTestApplication.Supervisor]
     # Supervisor.start_link(, opts)
     children = [
-      GCChat.HordeCache,
-      GCChat.LocalCache,
       {Horde.Registry, [name: GCChat.GlobalRegistry, keys: :unique, members: :auto]},
       {
         Horde.DynamicSupervisor,
@@ -23,6 +21,8 @@ defmodule BenchTestApplication do
           members: :auto
         ]
       },
+      GCChat.CacheAdapter.Local,
+      GCChat.CacheAdapter.Replicated,
       {BenchTest.Global, []}
     ]
 

@@ -19,6 +19,12 @@ defmodule GCChat do
       type: {:in, 10..3000},
       doc: "submit msgs to the server per [submit_interval] ms",
       default: 100
+    ],
+    cache_adapter: [
+      type: :atom,
+      doc: "where msgs to cache",
+      default: GCChat.LocalCache,
+      required: true
     ]
   ]
 
@@ -55,11 +61,34 @@ defmodule GCChat do
       @persist_interval Keyword.get(@opts, :persist_interval)
       @batch_size Keyword.get(@opts, :batch_size)
       @submit_interval Keyword.get(@opts, :submit_interval)
+      @cache_adapter Keyword.get(@opts, :cache_adapter)
 
       defdelegate build(attrs), to: GCChat.Message
 
       def send(%GCChat.Message{} = msg) do
         GenServer.cast(__MODULE__, {:send, msg})
+        :ok
+      end
+
+      def send({:ok, %GCChat.Message{} = msg}) do
+        GenServer.cast(__MODULE__, {:send, msg})
+        :ok
+      end
+
+      def send(error) do
+        {:error, error}
+      end
+
+      def lookup(channel, i) do
+        if cb = @cache_adapter.get(channel) do
+          GCChat.Entry.take(cb, i)
+        else
+          []
+        end
+      end
+
+      def cache_adapter() do
+        @cache_adapter
       end
 
       def server() do

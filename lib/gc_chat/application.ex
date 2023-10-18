@@ -20,7 +20,9 @@ defmodule GCChat.Application do
           strategy: :one_for_one,
           members: :auto
         ]
-      }
+      },
+      GCChat.CacheAdapter.Local,
+      GCChat.CacheAdapter.Replicated
     ]
 
     Supervisor.start_link(children, opts)
