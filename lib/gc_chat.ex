@@ -79,9 +79,9 @@ defmodule GCChat do
         {:error, error}
       end
 
-      def lookup(channel, i) do
+      def lookup(channel, last_id) do
         if cb = @cache_adapter.get(channel) do
-          GCChat.Entry.take(cb, i)
+          GCChat.Entry.take(cb, last_id)
         else
           []
         end
@@ -119,9 +119,14 @@ defmodule GCChat do
       end
 
       @impl true
+      def handle_info(:loop_submit, []) do
+        loop_submit()
+        {:noreply, []}
+      end
+
       def handle_info(:loop_submit, msgs) do
         {msgs, t} = Enum.split(msgs, -@batch_size)
-        GCChat.Server.send(__MODULE__, t)
+        GCChat.Server.send(__MODULE__, t |> Enum.reverse())
         loop_submit()
         {:noreply, msgs}
       end

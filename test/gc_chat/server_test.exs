@@ -42,4 +42,19 @@ defmodule GCChat.ServerTest do
       assert cb == cache.get("same_10k")
     end
   end
+
+  describe "BenchTest.Global.lookup(1,0) " do
+    test "return [] if never send msg" do
+      assert [] = BenchTest.Global.lookup(1, 0) |> Enum.map(& &1.id)
+    end
+
+    test "return [2,1] if send 2 msg" do
+      GCChat.Message.build(%{body: "body1", channel: "1", from: 1}) |> BenchTest.Global.send()
+      GCChat.Message.build(%{body: "body2", channel: "1", from: 1}) |> BenchTest.Global.send()
+      Process.sleep(100)
+
+      assert [{1, "body1"}, {2, "body2"}] =
+               BenchTest.Global.lookup("1", 0) |> Enum.map(&{&1.id, &1.body})
+    end
+  end
 end
