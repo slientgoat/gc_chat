@@ -10,7 +10,6 @@ defmodule BenchTestApplication do
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: BenchTestApplication.Supervisor]
-
     # Supervisor.start_link(, opts)
     children = [
       GCChat.HordeCache,

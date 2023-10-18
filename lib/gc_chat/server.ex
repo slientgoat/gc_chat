@@ -44,8 +44,8 @@ defmodule GCChat.Server do
     {:ok, ~M{%M persist,persist_interval,handler}, {:continue, :initialize}}
   end
 
-  def via_tuple(), do: via_tuple(__MODULE__)
-  def via_tuple(name), do: {:via, Horde.Registry, {GCChat.GlobalRegistry, name}}
+  def via_tuple(chat_type),
+    do: {:via, Horde.Registry, {GCChat.GlobalRegistry, :"#{chat_type}.Server"}}
 
   @loop_interval 100
 
@@ -57,6 +57,7 @@ defmodule GCChat.Server do
 
   @impl true
   def handle_info(:loop, state) do
+    Process.send_after(self(), :loop, @loop_interval)
     {:noreply, state}
   end
 

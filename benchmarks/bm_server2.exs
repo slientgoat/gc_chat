@@ -14,9 +14,9 @@ Benchee.run(
   },
   time: 10,
   before_scenario: fn x ->
-    IO.puts("waitting for #{chat_type}'s Server start")
+    IO.puts("waitting for #{chat_type}.Server start")
     GCChat.TestFixtures.wait_for_server_started(chat_type)
-    IO.puts(" #{chat_type}'s Server start success!")
+    IO.puts("#{chat_type}.Server start success!")
 
     IO.puts(
       "Current scenario is run at [#{inspect(self())}],and #{chat_type}.Server is run at [#{inspect(node(chat_type.server()))}] "

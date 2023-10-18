@@ -30,7 +30,7 @@ defmodule GCChat.TestFixtures do
   end
 
   def wait_for_server_started(chat_type) do
-    if GCChat.Server.pid(chat_type) |> is_pid() do
+    if chat_type.server() |> is_pid() do
       :ok
     else
       Process.sleep(100)

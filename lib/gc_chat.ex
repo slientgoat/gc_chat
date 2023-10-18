@@ -73,7 +73,7 @@ defmodule GCChat do
         opts = [chat_type: __MODULE__, persist: @persist, persist_interval: @persist_interval]
 
         with true <- GCChat.supervisor_started?() || {:error, :superviso_not_started},
-             {:ok, _pid} <- GCChat.start_global_service({GCChat.Server, opts}) do
+             {:ok, pid} <- GCChat.start_global_service({GCChat.Server, opts}) do
           {:ok, [], {:continue, :initialize}}
         else
           {:error, error} ->

@@ -16,15 +16,13 @@ defmodule GCChat.MixProject do
   if Mix.env() == :test do
     def application do
       [
-        mod: {BenchTestApplication, []},
-        extra_applications: [:logger]
+        mod: {BenchTestApplication, []}
       ]
     end
   else
     def application do
       [
-        mod: {Application, []},
-        extra_applications: [:logger]
+        mod: {Application, []}
       ]
     end
   end
