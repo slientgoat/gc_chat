@@ -56,6 +56,8 @@ defmodule GCChat do
       @batch_size Keyword.get(@opts, :batch_size)
       @submit_interval Keyword.get(@opts, :submit_interval)
 
+      defdelegate build(attrs), to: GCChat.Message
+
       def send(%GCChat.Message{} = msg) do
         GenServer.cast(__MODULE__, {:send, msg})
       end
