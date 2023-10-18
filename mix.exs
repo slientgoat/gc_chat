@@ -22,7 +22,7 @@ defmodule GCChat.MixProject do
   else
     def application do
       [
-        mod: {Application, []}
+        mod: {GCChat.Application, []}
       ]
     end
   end

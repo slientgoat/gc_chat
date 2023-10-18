@@ -4,6 +4,13 @@
 IO.puts("Nodes connected count #{Node.list() |> Enum.count()}")
 IO.puts("---------------------------------------------------")
 
+create_buffer = fn x ->
+  Enum.to_list(1..x)
+  |> Enum.reduce(CircularBuffer.new(x), fn i, acc ->
+    CircularBuffer.insert(acc, i)
+  end)
+end
+
 channel = "public"
 buffer = GCChat.Server.create_buffer(1000)
 GCChat.HordeCache.put(channel, buffer)

@@ -12,15 +12,17 @@ defmodule GCChat.ServerTest do
       assert %CircularBuffer{count: 1} = cb = buffers["uniq_10k-1"]
       assert %GCChat.Message{id: 1} = CircularBuffer.oldest(cb)
       assert %GCChat.Message{id: 1} = CircularBuffer.newest(cb)
+      assert cb == GCChat.LocalCache.get("uniq_10k-1")
 
       assert %CircularBuffer{count: 1} = cb = buffers["uniq_10k-10000"]
       assert %GCChat.Message{id: 1} = CircularBuffer.oldest(cb)
       assert %GCChat.Message{id: 1} = CircularBuffer.newest(cb)
+      assert cb == GCChat.LocalCache.get("uniq_10k-10000")
     end
 
     test "write 10k msgs with same channel ", %{state: state} do
       num = 10000
-      buffer_size = GCChat.Server.buffer_size()
+      buffer_size = state.buffer_size
 
       {:noreply, %{buffers: buffers} = state} =
         GCChat.Server.handle_cast({:write, make_same_channel_msgs("same_10k", num)}, state)
@@ -37,6 +39,7 @@ defmodule GCChat.ServerTest do
       assert %CircularBuffer{count: ^buffer_size} = cb = buffers["same_10k"]
       last_id = num * 2
       assert %GCChat.Message{id: ^last_id} = CircularBuffer.newest(cb)
+      assert cb == GCChat.LocalCache.get("same_10k")
     end
   end
 end

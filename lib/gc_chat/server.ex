@@ -1,12 +1,9 @@
 defmodule GCChat.Server do
   use GenServer
-  defstruct buffers: %{}, persist: nil, persist_interval: nil, handler: nil
+  defstruct buffers: %{}, persist: nil, persist_interval: nil, handler: nil, buffer_size: nil
   import ShorterMaps
 
   alias GCChat.Server, as: M
-  @buffer_size 1000
-
-  def buffer_size(), do: @buffer_size
 
   def send(chat_type, msgs) when is_list(msgs) do
     write(pid(chat_type), msgs)
@@ -41,7 +38,8 @@ defmodule GCChat.Server do
     persist = Keyword.get(opts, :persist)
     persist_interval = Keyword.get(opts, :persist_interval)
     handler = Keyword.get(opts, :chat_type, __MODULE__)
-    {:ok, ~M{%M persist,persist_interval,handler}, {:continue, :initialize}}
+    buffer_size = Keyword.get(opts, :buffer_size, 1000)
+    {:ok, ~M{%M persist,persist_interval,handler,buffer_size}, {:continue, :initialize}}
   end
 
   def via_tuple(chat_type),
@@ -62,59 +60,29 @@ defmodule GCChat.Server do
   end
 
   @impl true
-  def handle_cast({:write, msgs}, %M{buffers: buffers} = state) do
-    buffers = write_msgs(buffers, msgs)
+  def handle_cast({:write, msgs}, %M{buffers: buffers, buffer_size: buffer_size} = state) do
+    buffers = write_msgs(buffers, msgs, buffer_size)
     {:noreply, %{state | buffers: buffers}}
   end
 
-  def write_msgs(buffers, msgs) do
-    msgs
-    |> group_by_channel()
-    |> update_channels(buffers)
-  end
-
-  defp update_channels(channel_msgs, buffers) do
-    for {channel, msgs} <- channel_msgs, into: %{} do
-      (buffers[channel] || CircularBuffer.new(@buffer_size))
-      |> update_channel_msgs(msgs)
-      |> then(&{channel, &1})
-    end
-    |> then(&Map.merge(buffers, &1))
-  end
-
-  def write_msgs(msgs) do
-    msgs
-    |> group_by_channel()
-    |> update_channels()
+  def write_msgs(buffers, msgs, buffer_size) do
+    group_by_channel(msgs)
+    |> Enum.reduce(buffers, fn {channel, channel_msgs}, acc ->
+      (buffers[channel] || CircularBuffer.new(buffer_size))
+      |> update_channel_msgs(channel_msgs)
+      |> update_cache(channel)
+      |> then(&Map.put(acc, channel, &1))
+    end)
   end
 
   defp group_by_channel(msgs) do
     Enum.group_by(msgs, & &1.channel)
   end
 
-  defp update_channels(channel_msgs) do
-    for {channel, msgs} <- channel_msgs do
-      get_cb(channel)
-      |> update_channel_msgs(msgs)
-      |> update_cb(channel)
-    end
-  end
-
-  defp get_cb(channel) do
-    :ets.lookup(__MODULE__, channel)
-    |> case do
-      [{_, v}] ->
-        v
-
-      _ ->
-        CircularBuffer.new(@buffer_size)
-    end
-  end
-
-  defp update_channel_msgs(cb, msgs) do
+  defp update_channel_msgs(cb, channel_msgs) do
     last_id = get_last_id(cb)
 
-    msgs
+    channel_msgs
     |> Enum.reduce({cb, last_id}, fn msg, {acc, id} ->
       id = id + 1
       {CircularBuffer.insert(acc, %{msg | id: id}), id}
@@ -122,8 +90,9 @@ defmodule GCChat.Server do
     |> elem(0)
   end
 
-  defp update_cb(cb, channel) do
-    :ets.insert(__MODULE__, {channel, cb})
+  defp update_cache(cb, channel) do
+    GCChat.LocalCache.put(channel, cb)
+    cb
   end
 
   defp get_last_id(cb) do
