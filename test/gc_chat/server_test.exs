@@ -57,4 +57,22 @@ defmodule GCChat.ServerTest do
                BenchTest.Global.lookup("1", 0) |> Enum.map(&{&1.id, &1.body})
     end
   end
+
+  describe "BenchTest.Global.lookup(1,0) at gc-chat-cluster-2@127.0.0.1" do
+    test "return [2,1] if send 2 msg" do
+      :ok = LocalCluster.start()
+      [n1, n2 | _] = LocalCluster.start_nodes("gc-chat-cluster", 2)
+
+      :rpc.block_call(n1, BenchTest.Global, :send, [
+        GCChat.Message.build(%{body: "body1", channel: "1", from: 1})
+      ])
+
+      :rpc.block_call(n2, BenchTest.Global, :send, [
+        GCChat.Message.build(%{body: "body2", channel: "1", from: 1})
+      ])
+
+      Process.sleep(100)
+      assert [1, 2] == BenchTest.Global.lookup("1", 0) |> Enum.map(& &1.id)
+    end
+  end
 end
