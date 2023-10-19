@@ -52,7 +52,7 @@ defmodule GCChat.ServerTest do
     test "delete_channel c1 after add c1", %{state: %GCChat.Server{cache: cache} = state} do
       c = "#{System.unique_integer()}"
 
-      state = add_channel_msg(state, c)
+      state = add_channel_msgs(state, c, 1)
       assert %CircularBuffer{count: 1} = cb = state.buffers[c]
       assert cb == cache.get(c)
 
