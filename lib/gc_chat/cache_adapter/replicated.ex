@@ -7,4 +7,8 @@ defmodule GCChat.CacheAdapter.Replicated do
   def update_caches(entries) do
     put_all(entries)
   end
+
+  def delete_caches(channels) do
+    Enum.each(channels, &delete(&1))
+  end
 end

@@ -7,15 +7,15 @@ defmodule GCChat.Server do
   alias GCChat.Entry
 
   def send(chat_type, msgs) when is_list(msgs) do
-    write(pid(chat_type), msgs)
+    GenServer.cast(pid(chat_type), {:receive_msgs, msgs})
+  end
+
+  def delete_channels(chat_type, channel) do
+    GenServer.cast(pid(chat_type), {:delete_channels, channel})
   end
 
   def pid(chat_type) do
     via_tuple(chat_type) |> GenServer.whereis()
-  end
-
-  defp write(pid, msgs) when is_list(msgs) do
-    GenServer.cast(pid, {:write, msgs})
   end
 
   def child_spec(opts) do
@@ -47,24 +47,26 @@ defmodule GCChat.Server do
   def via_tuple(chat_type),
     do: {:via, Horde.Registry, {GCChat.GlobalRegistry, :"#{chat_type}.Server"}}
 
-  @loop_interval 100
-
   @impl true
   def handle_continue(:initialize, state) do
-    Process.send_after(self(), :loop, @loop_interval)
     {:noreply, state}
   end
 
   @impl true
   def handle_info(:loop, state) do
-    Process.send_after(self(), :loop, @loop_interval)
     {:noreply, state}
   end
 
   @impl true
-  def handle_cast({:write, msgs}, ~M{%M buffers,buffer_size,cache} = state) do
+  def handle_cast({:receive_msgs, msgs}, ~M{%M buffers,buffer_size,cache} = state) do
     {buffers, changed_keys} = write_msgs(buffers, msgs, buffer_size)
     update_caches(cache, Map.take(buffers, changed_keys))
+    {:noreply, %{state | buffers: buffers}}
+  end
+
+  def handle_cast({:delete_channels, channels}, ~M{%M buffers,cache} = state) do
+    buffers = Map.drop(buffers, channels)
+    delete_caches(cache, channels)
     {:noreply, %{state | buffers: buffers}}
   end
 
@@ -94,5 +96,9 @@ defmodule GCChat.Server do
 
   defp update_caches(cache, changes) do
     cache.update_caches(changes)
+  end
+
+  defp delete_caches(cache, channels) do
+    cache.delete_caches(channels)
   end
 end

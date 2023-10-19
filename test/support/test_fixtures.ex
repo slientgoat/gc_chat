@@ -37,4 +37,11 @@ defmodule GCChat.TestFixtures do
       wait_for_server_started(chat_type)
     end
   end
+
+  def add_channel_msg(state, channel) do
+    {:noreply, state} =
+      GCChat.Server.handle_cast({:receive_msgs, make_same_channel_msgs(channel, 1)}, state)
+
+    state
+  end
 end

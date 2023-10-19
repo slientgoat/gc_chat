@@ -53,6 +53,18 @@ defmodule GCChat do
     end
   end
 
+  def lookup(cache_adapter, channel, last_id) do
+    if cb = cache_adapter.get(channel) do
+      GCChat.Entry.take(cb, last_id)
+    else
+      []
+    end
+  end
+
+  def delete_channel(chat_type, channel) do
+    GCChat.Server.delete_channels(chat_type, [channel])
+  end
+
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
       use GenServer
@@ -65,14 +77,12 @@ defmodule GCChat do
 
       defdelegate build(attrs), to: GCChat.Message
 
-      def send(%GCChat.Message{} = msg) do
-        GenServer.cast(__MODULE__, {:send, msg})
-        :ok
+      def send({:ok, %GCChat.Message{} = msg}) do
+        send(msg)
       end
 
-      def send({:ok, %GCChat.Message{} = msg}) do
-        GenServer.cast(__MODULE__, {:send, msg})
-        :ok
+      def send(%GCChat.Message{} = msg) do
+        cast({:send, msg})
       end
 
       def send(error) do
@@ -80,15 +90,29 @@ defmodule GCChat do
       end
 
       def lookup(channel, last_id) do
-        if cb = @cache_adapter.get(channel) do
-          GCChat.Entry.take(cb, last_id)
-        else
-          []
-        end
+        GCChat.lookup(@cache_adapter, channel, last_id)
+      end
+
+      def delete_channel(channel) do
+        GCChat.delete_channel(__MODULE__, channel)
       end
 
       def cache_adapter() do
         @cache_adapter
+      end
+
+      def pid() do
+        __MODULE__ |> GenServer.whereis()
+      end
+
+      def cast(event) do
+        if pid = pid() do
+          GenServer.cast(pid, event)
+          :ok
+        else
+          IO.inspect(:not_alive)
+          {:error, :not_alive}
+        end
       end
 
       def server() do
