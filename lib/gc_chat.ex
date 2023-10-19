@@ -61,6 +61,14 @@ defmodule GCChat do
     end
   end
 
+  def newest_id(cache_adapter, channel) do
+    if cb = cache_adapter.get(channel) do
+      GCChat.Entry.get_last_id(cb)
+    else
+      nil
+    end
+  end
+
   def delete_channel(chat_type, channel) do
     GCChat.Server.delete_channels(chat_type, [channel])
   end
@@ -91,6 +99,10 @@ defmodule GCChat do
 
       def lookup(channel, last_id) do
         GCChat.lookup(@cache_adapter, channel, last_id)
+      end
+
+      def newest_id(channel) do
+        GCChat.newest_id(@cache_adapter, channel)
       end
 
       def delete_channel(channel) do
