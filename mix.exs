@@ -36,7 +36,6 @@ defmodule GCChat.MixProject do
     [
       {:ecto, "~> 3.10.0"},
       {:enum_type, "~> 1.1.0"},
-      {:shorter_maps, git: "https://github.com/boyzwj/shorter_maps.git", tag: "master"},
       {:circular_buffer, "~> 0.4.1"},
       {:nebulex, "~> 2.5"},
       {:shards, "~> 1.0"},

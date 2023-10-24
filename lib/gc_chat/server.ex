@@ -1,9 +1,8 @@
 defmodule GCChat.Server do
   use GenServer
   defstruct buffers: %{}, persist: nil, persist_interval: nil, cache: nil, buffer_size: nil
-  import ShorterMaps
 
-  alias GCChat.Server, as: M
+  alias __MODULE__, as: M
   alias GCChat.Entry
 
   def send(chat_type, msgs) when is_list(msgs) do
@@ -41,7 +40,14 @@ defmodule GCChat.Server do
     chat_type = Keyword.get(opts, :chat_type)
     cache = chat_type.cache_adapter()
     buffer_size = Keyword.get(opts, :buffer_size, 1000)
-    {:ok, ~M{%M persist,persist_interval,cache,buffer_size}, {:continue, :initialize}}
+
+    {:ok,
+     %M{
+       persist: persist,
+       persist_interval: persist_interval,
+       cache: cache,
+       buffer_size: buffer_size
+     }, {:continue, :initialize}}
   end
 
   def via_tuple(chat_type),
@@ -58,13 +64,16 @@ defmodule GCChat.Server do
   end
 
   @impl true
-  def handle_cast({:receive_msgs, msgs}, ~M{%M buffers,buffer_size,cache} = state) do
+  def handle_cast(
+        {:receive_msgs, msgs},
+        %M{buffers: buffers, buffer_size: buffer_size, cache: cache} = state
+      ) do
     {buffers, changed_keys} = write_msgs(buffers, msgs, buffer_size)
     update_caches(cache, Map.take(buffers, changed_keys))
     {:noreply, %{state | buffers: buffers}}
   end
 
-  def handle_cast({:delete_channels, channels}, ~M{%M buffers,cache} = state) do
+  def handle_cast({:delete_channels, channels}, %M{buffers: buffers, cache: cache} = state) do
     buffers = Map.drop(buffers, channels)
     delete_caches(cache, channels)
     {:noreply, %{state | buffers: buffers}}
