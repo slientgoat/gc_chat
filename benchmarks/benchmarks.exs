@@ -4,37 +4,32 @@
 IO.puts("Nodes connected count #{Node.list() |> Enum.count()}")
 IO.puts("---------------------------------------------------")
 
-create_buffer = fn x ->
-  Enum.to_list(1..x)
-  |> Enum.reduce(CircularBuffer.new(x), fn i, acc ->
-    CircularBuffer.insert(acc, i)
+create_buffer = fn size ->
+  GCChat.TestFixtures.make_same_channel_msgs("same_10k", size)
+  |> Enum.reduce({GCChat.Entry.new(size), 0}, fn msg, {acc, i} ->
+    last_id = i + 1
+    {GCChat.Entry.insert(acc, %{msg | id: last_id}), last_id}
   end)
+  |> elem(0)
 end
 
 channel = "public"
-buffer = GCChat.Server.create_buffer(1000)
-GCChat.HordeCache.put(channel, buffer)
-Process.sleep(1000)
-GCChat.HordeCache.get(channel) |> IO.inspect(label: "HordeCache")
+buffer = create_buffer.(1000)
+cache_adapter = GCChat.CacheAdapter.Replicated
+cache_adapter.put(channel, buffer)
 
-GCChat.LocalCache.put(channel, buffer)
-GCChat.LocalCache.get(channel) |> IO.inspect(label: "LocalCache")
-
-hander_pid = GCChat.Handler.via_tuple(GCChat.Handler) |> GenServer.whereis()
-
-node(hander_pid) |> IO.inspect(label: "GCChat.Handler.Node")
-
-Benchee.run(%{
-  "local lookup newest 500 msgs" => fn -> GCChat.lookup(500) end,
-  "local lookup newest 500 msgs" => fn -> GCChat.lookup(500) end,
-  "rpc.block_call lookup newest 500 msgs" => fn ->
-    :rpc.block_call(n1, GCChat, :lookup, [500])
-  end,
-  "rpc.call lookup newest 500 msgs" => fn -> :rpc.call(n1, GCChat, :lookup, [500]) end,
-  "HordeCache.lookup newest 500 msgs" => fn -> GCChat.HordeCache.lookup(channel, 500) end,
-  "LocalCache.lookup newest 500 msgs" => fn -> GCChat.LocalCache.lookup(channel, 500) end,
-  "GCChat.Router.lookup newest 500 msgs" => fn -> GCChat.Router.lookup(channel, 500) end,
-  "GCChat.Router.lookup2 newest 500 msgs" => fn ->
-    GCChat.Router.lookup(hander_pid, channel, 500)
-  end
-})
+Benchee.run(
+  %{
+    # "local lookup newest 500 msgs" => fn input -> GCChat.lookup(cache_adapter, channel, input) end,
+    # "rpc.block_call lookup newest 500 msgs" => fn input ->
+    #   :rpc.block_call(n1, GCChat, :lookup, [cache_adapter, channel, input])
+    # end,
+    # "rpc.call lookup newest 500 msgs" => fn input ->
+    #   :rpc.call(n1, GCChat, :lookup, [cache_adapter, channel, input])
+    # end,
+    "rpc.cast lookup newest 500 msgs" => fn input ->
+      :rpc.cast(n1, GCChat, :lookup, [cache_adapter, channel, input])
+    end
+  },
+  inputs: %{"newest 500 msgs" => 500}
+)

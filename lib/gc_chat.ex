@@ -122,8 +122,7 @@ defmodule GCChat do
           GenServer.cast(pid, event)
           :ok
         else
-          IO.inspect(:not_alive)
-          {:error, :not_alive}
+          :error
         end
       end
 
@@ -137,10 +136,15 @@ defmodule GCChat do
 
       @impl true
       def init(_) do
-        opts = [chat_type: __MODULE__, persist: @persist, persist_interval: @persist_interval]
+        opts = [
+          chat_type: __MODULE__,
+          persist: @persist,
+          persist_interval: @persist_interval,
+          pool_size: System.schedulers_online()
+        ]
 
         with true <- GCChat.supervisor_started?() || {:error, :superviso_not_started},
-             {:ok, pid} <- GCChat.start_global_service({GCChat.Server, opts}) do
+             {:ok, pid} <- GCChat.start_global_service({GCChat.ServerManager, opts}) do
           {:ok, [], {:continue, :initialize}}
         else
           {:error, error} ->
@@ -174,6 +178,10 @@ defmodule GCChat do
 
       defp loop_submit() do
         Process.send_after(self(), :loop_submit, @submit_interval)
+      end
+
+      defp loop_garbage() do
+        Process.send_after(self(), :loop_garbage, @submit_interval)
       end
     end
   end

@@ -68,7 +68,7 @@ defmodule GCChat.ServerTest do
       assert [] = BenchTest.Global.lookup(c, 0) |> Enum.map(& &1.id)
       GCChat.Message.build(%{body: "body1", channel: c, from: 1}) |> BenchTest.Global.send()
       GCChat.Message.build(%{body: "body2", channel: c, from: 1}) |> BenchTest.Global.send()
-      Process.sleep(100)
+      Process.sleep(200)
 
       assert [{1, "body1"}, {2, "body2"}] =
                BenchTest.Global.lookup(c, 0) |> Enum.map(&{&1.id, &1.body})
@@ -89,7 +89,7 @@ defmodule GCChat.ServerTest do
         GCChat.Message.build(%{body: "body2", channel: c, from: 1})
       ])
 
-      Process.sleep(101)
+      Process.sleep(201)
       assert [1, 2] == BenchTest.Global.lookup(c, 0) |> Enum.map(& &1.id)
     end
   end

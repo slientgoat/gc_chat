@@ -8,14 +8,14 @@ chat_type = BenchTest.Global
 
 Benchee.run(
   %{
-    "GCChat.Server.send/1" => fn {t, msgs} ->
-      GCChat.Server.send(t, msgs)
+    "GCChat.Server.send/1" => fn {chat_type, msgs} ->
+      GCChat.Server.send(chat_type, msgs)
     end
   },
   time: 10,
   before_scenario: fn x ->
     IO.puts("waitting for #{chat_type}.Server start")
-    GCChat.TestFixtures.wait_for_server_started(chat_type)
+    GCChat.TestFixtures.wait_for_server_started(fn -> chat_type.server() end)
     IO.puts("#{chat_type}.Server start success!")
 
     IO.puts(
@@ -24,12 +24,18 @@ Benchee.run(
 
     x
   end,
-  before_each: fn x ->
-    Process.sleep(10)
-    x
-  end,
+  # before_each: fn x ->
+  #   Process.sleep(1)
+  #   x
+  # end,
   inputs: %{
-    "uniq_10k" => {chat_type, GCChat.TestFixtures.make_uniq_channel_msgs("uniq_10k", 10000)},
-    "same_10k" => {chat_type, GCChat.TestFixtures.make_same_channel_msgs("same_10k", 10000)}
+    # "same_10000" => {chat_type, GCChat.TestFixtures.make_same_channel_msgs("same_10000", 10000)}
+    # "same_1000" => {chat_type, GCChat.TestFixtures.make_same_channel_msgs("same_1000", 1000)},
+    # "same_100" => {chat_type, GCChat.TestFixtures.make_same_channel_msgs("same_100", 100)},
+    # "same_1" => {chat_type, GCChat.TestFixtures.make_same_channel_msgs("same_1", 1)},
+    # "uniq_10000" => {chat_type, GCChat.TestFixtures.make_uniq_channel_msgs("uniq_10000", 10000)},
+    "uniq_1000" => {chat_type, GCChat.TestFixtures.make_uniq_channel_msgs("uniq_1000", 1000)},
+    # "uniq_100" => {chat_type, GCChat.TestFixtures.make_uniq_channel_msgs("uniq_100", 100)},
+    "uniq_1" => {chat_type, GCChat.TestFixtures.make_uniq_channel_msgs("uniq_1", 1)}
   }
 )

@@ -29,12 +29,12 @@ defmodule GCChat.TestFixtures do
     %{state: state}
   end
 
-  def wait_for_server_started(chat_type) do
-    if chat_type.server() |> is_pid() do
+  def wait_for_server_started(f_pid) do
+    if f_pid.() |> is_pid() do
       :ok
     else
       Process.sleep(100)
-      wait_for_server_started(chat_type)
+      wait_for_server_started(f_pid)
     end
   end
 
