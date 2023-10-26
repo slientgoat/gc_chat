@@ -5,12 +5,12 @@ defmodule GCChat.Server do
   alias __MODULE__, as: M
   alias GCChat.Entry
 
-  def send(chat_type, msgs) when is_list(msgs) do
-    GenServer.cast(pid(chat_type), {:receive_msgs, msgs})
+  def send(worker, msgs) when is_list(msgs) do
+    GenServer.cast(worker, {:receive_msgs, msgs})
   end
 
-  def delete_channels(chat_type, channel) do
-    GenServer.cast(pid(chat_type), {:delete_channels, channel})
+  def delete_channels(worker, channels) when is_list(channels) do
+    GenServer.cast(worker, {:delete_channels, channels})
   end
 
   def child_spec(opts) do
@@ -33,8 +33,8 @@ defmodule GCChat.Server do
   def init(opts) do
     persist = Keyword.get(opts, :persist)
     persist_interval = Keyword.get(opts, :persist_interval)
-    chat_type = Keyword.get(opts, :chat_type)
-    cache = chat_type.cache_adapter()
+    instance = Keyword.get(opts, :instance)
+    cache = instance.cache_adapter()
     buffer_size = Keyword.get(opts, :buffer_size, 1000)
     id = Keyword.get(opts, :id)
     :yes = :global.re_register_name(worker_name(id), self())
@@ -49,7 +49,11 @@ defmodule GCChat.Server do
   end
 
   def pid(id) do
-    {:global, worker_name(id)} |> GenServer.whereis()
+    via_tuple(id) |> GenServer.whereis()
+  end
+
+  def via_tuple(id) do
+    {:global, worker_name(id)}
   end
 
   def worker_name(id), do: :"#{__MODULE__}.#{id}"

@@ -1,5 +1,6 @@
 defmodule GCChat.ServerTest do
   use GCChat.DataCase
+  use ExUnit.Case, async: true
   import GCChat.TestFixtures
 
   describe "handle_cast({:receive_msgs, msgs}" do
@@ -65,31 +66,38 @@ defmodule GCChat.ServerTest do
   describe "BenchTest.Global.lookup(1,0) " do
     test "return [2,1] if send 2 msg" do
       c = "#{System.unique_integer()}"
+
       assert [] = BenchTest.Global.lookup(c, 0) |> Enum.map(& &1.id)
-      GCChat.Message.build(%{body: "body1", channel: c, from: 1}) |> BenchTest.Global.send()
-      GCChat.Message.build(%{body: "body2", channel: c, from: 1}) |> BenchTest.Global.send()
-      Process.sleep(200)
+
+      assert :ok ==
+               GCChat.Message.build(%{chat_type: 0, body: "body1", channel: c, from: 1})
+               |> BenchTest.Global.send()
+
+      assert :ok ==
+               GCChat.Message.build(%{chat_type: 0, body: "body2", channel: c, from: 1})
+               |> BenchTest.Global.send()
+
+      Process.sleep(300)
 
       assert [{1, "body1"}, {2, "body2"}] =
                BenchTest.Global.lookup(c, 0) |> Enum.map(&{&1.id, &1.body})
     end
   end
 
-  describe "BenchTest.Global.lookup(2,0) at gc-chat-cluster-2@127.0.0.1" do
-    test "return [2,1] if send 2 msg" do
+  describe "BenchTest.Global.lookup/2" do
+    test "return [2,1] if the node1 and node2 will send a msg by each node node1 and node2 " do
       c = "#{System.unique_integer()}"
-      :ok = LocalCluster.start()
-      [n1, n2 | _] = LocalCluster.start_nodes("gc-chat-cluster", 2)
+      [n1, n2 | _] = Node.list()
 
       :rpc.block_call(n1, BenchTest.Global, :send, [
-        GCChat.Message.build(%{body: "body1", channel: c, from: 1})
+        GCChat.Message.build(%{chat_type: 0, body: "body1", channel: c, from: 1})
       ])
 
       :rpc.block_call(n2, BenchTest.Global, :send, [
-        GCChat.Message.build(%{body: "body2", channel: c, from: 1})
+        GCChat.Message.build(%{chat_type: 0, body: "body2", channel: c, from: 1})
       ])
 
-      Process.sleep(201)
+      Process.sleep(300)
       assert [1, 2] == BenchTest.Global.lookup(c, 0) |> Enum.map(& &1.id)
     end
   end

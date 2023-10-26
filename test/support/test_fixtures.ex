@@ -1,18 +1,19 @@
 defmodule GCChat.TestFixtures do
-  def make_uniq_channel_msgs(channel_prfix, num) do
+  def make_uniq_channel_msgs(channel_prfix, num, chat_type \\ 0) do
     fn x -> "#{channel_prfix}-#{x}" end
-    |> make_channel_msgs(num)
+    |> make_channel_msgs(num, chat_type)
   end
 
-  def make_same_channel_msgs(channel, num) do
+  def make_same_channel_msgs(channel, num, chat_type \\ 0) do
     fn _x -> channel end
-    |> make_channel_msgs(num)
+    |> make_channel_msgs(num, chat_type)
   end
 
-  defp make_channel_msgs(channel_cast_fun, num) do
+  defp make_channel_msgs(channel_cast_fun, num, chat_type) do
     for i <- Enum.to_list(1..num) do
       {:ok, msg} =
         GCChat.Message.build(%{
+          chat_type: chat_type,
           body: "body-#{i}",
           channel: channel_cast_fun.(i),
           from: i,
@@ -24,7 +25,7 @@ defmodule GCChat.TestFixtures do
   end
 
   def create_server(_args \\ []) do
-    {:ok, state, {:continue, continue}} = GCChat.Server.init(chat_type: BenchTest.Global)
+    {:ok, state, {:continue, continue}} = GCChat.Server.init(instance: BenchTest.Global)
     {:noreply, state} = GCChat.Server.handle_continue(continue, state)
     %{state: state}
   end

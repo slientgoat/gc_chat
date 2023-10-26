@@ -1,9 +1,23 @@
 defmodule GCChat.ServerManager do
   use GenServer
   require Logger
+  defstruct pool_size: nil, instance: nil
+
+  def worker_for_channel(channel, pool_size) do
+    :erlang.phash2(channel, pool_size)
+    |> GCChat.Server.via_tuple()
+  end
+
+  def pool_size(pid \\ via_tuple()) do
+    GenServer.call(pid, :pool_size)
+  end
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: via_tuple())
+  end
+
+  def pid() do
+    GenServer.whereis(via_tuple())
   end
 
   def via_tuple(),
@@ -11,7 +25,8 @@ defmodule GCChat.ServerManager do
 
   @impl true
   def init(opts) do
-    pool_size = opts[:pool_size]
+    pool_size = Keyword.get(opts, :server_pool_size, nil) || System.schedulers_online()
+
     Process.flag(:trap_exit, true)
     {:ok, _} = DynamicSupervisor.start_link(name: dynamic_supervisor_name())
 
@@ -21,7 +36,8 @@ defmodule GCChat.ServerManager do
       {id, pid}
     end)
 
-    {:ok, opts}
+    instance = Keyword.get(opts, :instance)
+    {:ok, %GCChat.ServerManager{pool_size: pool_size, instance: instance}}
   end
 
   def dynamic_supervisor_name() do
@@ -41,5 +57,10 @@ defmodule GCChat.ServerManager do
 
   def handle_info({:EXIT, _pid, _reason}, state) do
     {:stop, :normal, state}
+  end
+
+  @impl true
+  def handle_call(:pool_size, _from, %GCChat.ServerManager{pool_size: pool_size} = state) do
+    {:reply, pool_size, state}
   end
 end

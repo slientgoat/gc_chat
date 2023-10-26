@@ -15,6 +15,10 @@ defmodule GCChat do
       doc: "submit max [batch_size] msgs to server per time",
       default: 200
     ],
+    server_pool_size: [
+      type: :non_neg_integer,
+      doc: "the pool size of server worker. default: System.schedulers_online()"
+    ],
     submit_interval: [
       type: {:in, 10..3000},
       doc: "submit msgs to the server per [submit_interval] ms",
@@ -33,26 +37,6 @@ defmodule GCChat do
     default
   end
 
-  def supervisor_started?() do
-    GCChat.DistributedSupervisor |> GenServer.whereis() |> is_pid()
-  end
-
-  def start_global_service({mod, _} = child_spec) do
-    case Horde.DynamicSupervisor.start_child(GCChat.DistributedSupervisor, child_spec) do
-      {:ok, pid} ->
-        {:ok, pid}
-
-      {:error, {:already_started, pid}} ->
-        {:ok, pid}
-
-      :ignore ->
-        {:ok, mod.pid()}
-
-      {:error, error} ->
-        {:error, error}
-    end
-  end
-
   def lookup(cache_adapter, channel, last_id) do
     if cb = cache_adapter.get(channel) do
       GCChat.Entry.take(cb, last_id)
@@ -69,8 +53,39 @@ defmodule GCChat do
     end
   end
 
-  def delete_channel(chat_type, channel) do
-    GCChat.Server.delete_channels(chat_type, [channel])
+  def group_msgs(msgs, server_pool_size) do
+    msgs
+    |> Enum.group_by(&GCChat.ServerManager.worker_for_channel(&1.channel, server_pool_size))
+  end
+
+  def submit_msgs(grouped_msgs, batch_size) do
+    grouped_msgs
+    |> Enum.reduce([], fn {worker, list}, acc ->
+      if is_pid(GenServer.whereis(worker)) do
+        list
+        |> Enum.reverse()
+        |> Enum.chunk_every(batch_size)
+        |> Enum.each(&GCChat.Server.send(worker, &1))
+
+        acc
+      else
+        Enum.reverse(list) ++ acc
+      end
+    end)
+    |> Enum.reverse()
+  end
+
+  def delete_channels(channels, server_pool_size) do
+    channels
+    |> Enum.group_by(&GCChat.ServerManager.worker_for_channel(&1, server_pool_size))
+    |> Enum.reduce([], fn {worker, list}, acc ->
+      if is_pid(worker) do
+        GCChat.Server.delete_channels(worker, list)
+        acc
+      else
+        list ++ acc
+      end
+    end)
   end
 
   defmacro __using__(opts) do
@@ -106,7 +121,7 @@ defmodule GCChat do
       end
 
       def delete_channel(channel) do
-        GCChat.delete_channel(__MODULE__, channel)
+        GCChat.delete_channels([channel], get_server_pool_size())
       end
 
       def cache_adapter() do
@@ -136,20 +151,46 @@ defmodule GCChat do
 
       @impl true
       def init(_) do
-        opts = [
-          chat_type: __MODULE__,
-          persist: @persist,
-          persist_interval: @persist_interval,
-          pool_size: System.schedulers_online()
-        ]
+        opts = Keyword.put(@opts, :instance, __MODULE__)
 
-        with true <- GCChat.supervisor_started?() || {:error, :superviso_not_started},
-             {:ok, pid} <- GCChat.start_global_service({GCChat.ServerManager, opts}) do
+        with true <- supervisor_started?() || {:error, :superviso_not_started},
+             {:ok, pid} <- start_global_service({GCChat.ServerManager, opts}) do
+          GCChat.ServerManager.pool_size(pid)
+          |> put_server_pool_size()
+
           {:ok, [], {:continue, :initialize}}
         else
           {:error, error} ->
             {:stop, error}
         end
+      end
+
+      def supervisor_started?() do
+        GCChat.DistributedSupervisor |> GenServer.whereis() |> is_pid()
+      end
+
+      defp start_global_service({mod, _} = child_spec) do
+        case Horde.DynamicSupervisor.start_child(GCChat.DistributedSupervisor, child_spec) do
+          {:ok, pid} ->
+            {:ok, pid}
+
+          {:error, {:already_started, pid}} ->
+            {:ok, pid}
+
+          :ignore ->
+            {:ok, mod.pid()}
+
+          {:error, error} ->
+            {:error, error}
+        end
+      end
+
+      def put_server_pool_size(server_pool_size) do
+        :persistent_term.put({__MODULE__, :server_pool_size}, server_pool_size)
+      end
+
+      def get_server_pool_size() do
+        :persistent_term.get({__MODULE__, :server_pool_size})
       end
 
       @impl true
@@ -165,10 +206,12 @@ defmodule GCChat do
       end
 
       def handle_info(:loop_submit, msgs) do
-        {msgs, t} = Enum.split(msgs, -@batch_size)
-        GCChat.Server.send(__MODULE__, t |> Enum.reverse())
+        rest =
+          GCChat.group_msgs(msgs, get_server_pool_size())
+          |> GCChat.submit_msgs(@batch_size)
+
         loop_submit()
-        {:noreply, msgs}
+        {:noreply, rest}
       end
 
       @impl true

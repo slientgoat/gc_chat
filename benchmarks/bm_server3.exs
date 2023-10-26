@@ -1,4 +1,4 @@
-chat_type = BenchTest.Global
+instance = BenchTest.Global
 GCChat.TestFixtures.add_channel_msgs("Replicated", 1000)
 
 Benchee.run(
@@ -9,12 +9,12 @@ Benchee.run(
   },
   time: 10,
   before_scenario: fn x ->
-    IO.puts("waitting for #{chat_type}.Server start")
-    GCChat.TestFixtures.wait_for_server_started(fn -> chat_type.server() end)
-    IO.puts("#{chat_type}.Server start success!")
+    IO.puts("waitting for #{instance}.Server start")
+    GCChat.TestFixtures.wait_for_server_started(fn -> instance.server() end)
+    IO.puts("#{instance}.Server start success!")
 
     IO.puts(
-      "Current scenario is run at [#{inspect(self())}],and #{chat_type}.Server is run at [#{inspect(node(chat_type.server()))}] "
+      "Current scenario is run at [#{inspect(self())}],and #{instance}.Server is run at [#{inspect(node(instance.server()))}] "
     )
 
     x

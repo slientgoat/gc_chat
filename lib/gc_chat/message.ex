@@ -4,13 +4,14 @@ defmodule GCChat.Message do
   alias GCChat.Message, as: M
   @type channel :: String.t()
   schema "chat_message" do
+    field(:chat_type, :integer)
     field(:channel, :string)
     field(:from, :integer)
     field(:send_at, :integer)
     field(:body, :string)
   end
 
-  @require_fields ~w(channel from send_at body)a
+  @require_fields ~w(chat_type channel from send_at body)a
   @cast_fields @require_fields
 
   def require_fields(), do: @require_fields
