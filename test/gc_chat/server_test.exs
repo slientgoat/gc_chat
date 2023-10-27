@@ -6,7 +6,7 @@ defmodule GCChat.ServerTest do
   describe "handle_cast({:receive_msgs, msgs}" do
     setup [:create_server]
 
-    test "write 10k msgs with uniq channel", %{state: %GCChat.Server{cache: cache} = state} do
+    test "write 10k msgs with uniq channel", %{state: %GCChat.Server{handler: handler} = state} do
       {:noreply, %{buffers: buffers}} =
         GCChat.Server.handle_cast(
           {:receive_msgs, make_uniq_channel_msgs("uniq_10k", 10000)},
@@ -16,15 +16,15 @@ defmodule GCChat.ServerTest do
       assert %CircularBuffer{count: 1} = cb = buffers["uniq_10k-1"]
       assert %GCChat.Message{id: 1} = CircularBuffer.oldest(cb)
       assert %GCChat.Message{id: 1} = CircularBuffer.newest(cb)
-      assert cb == cache.get("uniq_10k-1")
+      assert cb == cache_get(handler, "uniq_10k-1")
 
       assert %CircularBuffer{count: 1} = cb = buffers["uniq_10k-10000"]
       assert %GCChat.Message{id: 1} = CircularBuffer.oldest(cb)
       assert %GCChat.Message{id: 1} = CircularBuffer.newest(cb)
-      assert cb == cache.get("uniq_10k-10000")
+      assert cb == cache_get(handler, "uniq_10k-10000")
     end
 
-    test "write 10k msgs with same channel ", %{state: %GCChat.Server{cache: cache} = state} do
+    test "write 10k msgs with same channel ", %{state: %GCChat.Server{handler: handler} = state} do
       num = 10000
       buffer_size = state.buffer_size
 
@@ -43,19 +43,19 @@ defmodule GCChat.ServerTest do
       assert %CircularBuffer{count: ^buffer_size} = cb = buffers["same_10k"]
       last_id = num * 2
       assert %GCChat.Message{id: ^last_id} = CircularBuffer.newest(cb)
-      assert cb == cache.get("same_10k")
+      assert cb == cache_get(handler, "same_10k")
     end
   end
 
   describe "handle_cast({:delete_channel, channels}" do
     setup [:create_server]
 
-    test "delete_channel c1 after add c1", %{state: %GCChat.Server{cache: cache} = state} do
+    test "delete_channel c1 after add c1", %{state: %GCChat.Server{handler: handler} = state} do
       c = "#{System.unique_integer()}"
 
       state = add_channel_msgs(state, c, 1)
       assert %CircularBuffer{count: 1} = cb = state.buffers[c]
-      assert cb == cache.get(c)
+      assert cb == cache_get(handler, c)
 
       {:noreply, state} = GCChat.Server.handle_cast({:delete_channels, [c]}, state)
 
@@ -100,5 +100,9 @@ defmodule GCChat.ServerTest do
       Process.sleep(300)
       assert [1, 2] == BenchTest.Global.lookup(c, 0) |> Enum.map(& &1.id)
     end
+  end
+
+  defp cache_get(handler, key) do
+    handler.adapter().get(key)
   end
 end

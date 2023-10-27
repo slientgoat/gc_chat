@@ -37,17 +37,17 @@ defmodule GCChat do
     default
   end
 
-  def lookup(cache_adapter, channel, last_id) do
-    if cb = cache_adapter.get(channel) do
-      GCChat.Entry.take(cb, last_id)
+  def lookup(cache_adapter, channel_name, last_id) do
+    if entry = cache_adapter.get(channel_name) do
+      GCChat.Channel.take(entry, last_id)
     else
       []
     end
   end
 
-  def newest_id(cache_adapter, channel) do
-    if cb = cache_adapter.get(channel) do
-      GCChat.Entry.get_last_id(cb)
+  def newest_id(cache_adapter, channel_name) do
+    if entry = cache_adapter.get(channel_name) do
+      GCChat.Channel.last_id(entry)
     else
       nil
     end
