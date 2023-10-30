@@ -5,6 +5,9 @@ defmodule GCChat.Config do
     %__MODULE__{}
   end
 
+  def default_ttl(), do: %__MODULE__{}.ttl
+  def default_buffer_size(), do: %__MODULE__{}.buffer_size
+
   def runtime_config() do
     %{}
   end

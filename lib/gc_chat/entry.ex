@@ -1,11 +1,4 @@
-defmodule GCChat.Channel do
-  defmodule Message do
-    defstruct id: nil,
-              body: nil,
-              from: nil,
-              send_at: nil
-  end
-
+defmodule GCChat.Entry do
   defstruct name: nil,
             cb: nil,
             last_id: 0,
@@ -26,6 +19,13 @@ defmodule GCChat.Channel do
           persisted_at: non_neg_integer()
         }
 
+  defmodule Message do
+    defstruct id: nil,
+              body: nil,
+              from: nil,
+              send_at: nil
+  end
+
   @type entries :: %{GCChat.Message.channel() => t()}
   alias __MODULE__, as: M
 
@@ -36,6 +36,10 @@ defmodule GCChat.Channel do
 
   def last_id(%M{last_id: last_id}) do
     last_id
+  end
+
+  def circular_buffer(%M{cb: cb}) do
+    cb
   end
 
   def push(%M{cb: cb, last_id: last_id} = m, %GCChat.Message{} = msg, now) do

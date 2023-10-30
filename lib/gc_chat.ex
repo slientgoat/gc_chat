@@ -39,7 +39,7 @@ defmodule GCChat do
 
   def lookup(cache_adapter, channel_name, last_id) do
     if entry = cache_adapter.get(channel_name) do
-      GCChat.Channel.take(entry, last_id)
+      GCChat.Entry.take(entry, last_id)
     else
       []
     end
@@ -47,7 +47,7 @@ defmodule GCChat do
 
   def newest_id(cache_adapter, channel_name) do
     if entry = cache_adapter.get(channel_name) do
-      GCChat.Channel.last_id(entry)
+      GCChat.Entry.last_id(entry)
     else
       nil
     end
@@ -75,12 +75,12 @@ defmodule GCChat do
     |> Enum.reverse()
   end
 
-  def delete_channels(channels, server_pool_size) do
-    channels
+  def delete_entries(names, server_pool_size) do
+    names
     |> Enum.group_by(&GCChat.ServerManager.worker_for_channel(&1, server_pool_size))
     |> Enum.reduce([], fn {worker, list}, acc ->
       if is_pid(worker) do
-        GCChat.Server.delete_channels(worker, list)
+        GCChat.Server.delete_entries(worker, list)
         acc
       else
         list ++ acc
@@ -121,7 +121,7 @@ defmodule GCChat do
       end
 
       def delete_channel(channel) do
-        GCChat.delete_channels([channel], get_server_pool_size())
+        GCChat.delete_entries([channel], get_server_pool_size())
       end
 
       def cache_adapter() do

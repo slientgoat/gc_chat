@@ -1,6 +1,6 @@
 defmodule GCChat.Server do
   use GenServer
-  defstruct channels: %{}, handler: nil
+  defstruct entries: %{}, handler: nil
 
   alias __MODULE__, as: M
 
@@ -8,8 +8,8 @@ defmodule GCChat.Server do
     GenServer.cast(worker, {:receive_msgs, msgs})
   end
 
-  def delete_channels(worker, channels) when is_list(channels) do
-    GenServer.cast(worker, {:delete_channels, channels})
+  def delete_entries(worker, entries) when is_list(entries) do
+    GenServer.cast(worker, {:delete_entries, entries})
   end
 
   def child_spec(opts) do
@@ -61,35 +61,35 @@ defmodule GCChat.Server do
   end
 
   @impl true
-  def handle_cast({:receive_msgs, msgs}, %M{channels: channels, handler: handler} = state) do
-    changed_channels = handle_new_msgs(channels, Enum.reverse(msgs), handler.now())
-    update_caches(handler, changed_channels)
-    {:noreply, %M{state | channels: Map.merge(channels, changed_channels)}}
+  def handle_cast({:receive_msgs, msgs}, %M{entries: entries, handler: handler} = state) do
+    changed_entries = handle_new_msgs(entries, msgs, handler.now())
+    update_caches(handler, changed_entries)
+    {:noreply, %M{state | entries: Map.merge(entries, changed_entries)}}
   end
 
   def handle_cast(
-        {:delete_channels, channel_names},
-        %M{channels: channels, handler: handler} = state
+        {:delete_entries, channel_names},
+        %M{entries: entries, handler: handler} = state
       ) do
-    channels = Map.drop(channels, channel_names)
+    entries = Map.drop(entries, channel_names)
     delete_caches(handler, channel_names)
-    {:noreply, %{state | channels: channels}}
+    {:noreply, %{state | entries: entries}}
   end
 
-  def handle_new_msgs(channels, msgs, now) do
+  def handle_new_msgs(entries, msgs, now) do
     Enum.reduce(msgs, %{}, fn %GCChat.Message{channel: channel} = msg, acc ->
-      (acc[channel] || get_buffer(channels, msg, now))
-      |> GCChat.Channel.push(msg, now)
+      (acc[channel] || get_buffer(entries, msg, now))
+      |> GCChat.Entry.push(msg, now)
       |> then(&Map.put(acc, channel, &1))
     end)
   end
 
-  defp get_buffer(channels, %GCChat.Message{channel: channel, chat_type: chat_type}, now) do
-    if buffer = channels[channel] do
+  defp get_buffer(entries, %GCChat.Message{channel: channel, chat_type: chat_type}, now) do
+    if buffer = entries[channel] do
       buffer
     else
       config = GCChat.Config.runtime_config(chat_type)
-      GCChat.Channel.new(channel, now, config)
+      GCChat.Entry.new(channel, now, config)
     end
   end
 

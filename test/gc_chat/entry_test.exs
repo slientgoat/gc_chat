@@ -1,7 +1,6 @@
-defmodule GCChat.ChannelTest do
+defmodule GCChat.EntryTest do
   use GCChat.DataCase
   use ExUnit.Case, async: true
-  import GCChat.TestFixtures
 
   # describe "new/2" do
   #   test "submit fail if all channel worker not exist" do
