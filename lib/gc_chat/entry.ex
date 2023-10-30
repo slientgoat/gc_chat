@@ -6,7 +6,7 @@ defmodule GCChat.Entry do
             touched_at: nil,
             updated_at: nil,
             created_at: nil,
-            persisted_at: nil
+            enable_persist: false
 
   @type t :: %__MODULE__{
           name: GCChat.Message.channel(),
@@ -16,7 +16,7 @@ defmodule GCChat.Entry do
           touched_at: non_neg_integer(),
           updated_at: non_neg_integer(),
           created_at: non_neg_integer(),
-          persisted_at: non_neg_integer()
+          enable_persist: boolean()
         }
 
   defmodule Message do
@@ -42,11 +42,15 @@ defmodule GCChat.Entry do
     cb
   end
 
-  def push(%M{cb: cb, last_id: last_id} = m, %GCChat.Message{} = msg, now) do
+  def push(%M{cb: cb, last_id: last_id} = entry, %GCChat.Message{} = msg, now) do
     id = last_id + 1
     val = msg |> Map.from_struct() |> then(&struct(Message, &1)) |> Map.put(:id, id)
-    cb = CircularBuffer.insert(cb, val)
-    %M{m | cb: cb, last_id: id, updated_at: now, touched_at: now}
+
+    entry
+    |> update_cb(CircularBuffer.insert(cb, val))
+    |> update_last_id(id)
+    |> update_updated_at(now)
+    |> update_touched_at(now)
   end
 
   def new(
@@ -55,7 +59,7 @@ defmodule GCChat.Entry do
         %GCChat.Config{buffer_size: buffer_size, ttl: ttl} = config
       ) do
     cb = CircularBuffer.new(buffer_size)
-    persisted_at = init_persisted_at(GCChat.Config.enable_persist?(config))
+    enable_persist = GCChat.Config.enable_persist?(config)
 
     %M{
       name: name,
@@ -64,17 +68,14 @@ defmodule GCChat.Entry do
       touched_at: now,
       updated_at: now,
       created_at: now,
-      persisted_at: persisted_at
+      enable_persist: enable_persist
     }
   end
 
-  defp init_persisted_at(enable_persist?) do
-    if enable_persist? do
-      0
-    else
-      nil
-    end
-  end
+  def update_cb(entry, cb), do: %M{entry | cb: cb}
+  def update_last_id(entry, last_id), do: %M{entry | last_id: last_id}
+  def update_updated_at(entry, updated_at), do: %M{entry | updated_at: updated_at}
+  def update_touched_at(entry, touched_at), do: %M{entry | touched_at: touched_at}
 
   def expired?(%M{ttl: :infinity}, _now) do
     false
@@ -93,7 +94,7 @@ defmodule GCChat.Entry do
     end
   end
 
-  def persist?(%M{persisted_at: persisted_at}) do
-    persisted_at != nil
+  def persist?(%M{enable_persist: enable_persist}) do
+    enable_persist
   end
 end

@@ -7,8 +7,4 @@ defmodule BenchTest.Global do
       99 => [persist_interval: 1000]
     }
   end
-
-  def now() do
-    System.os_time(:second)
-  end
 end

@@ -83,12 +83,16 @@ defmodule GCChat.ServerTest do
         GCChat.Message.build(%{chat_type: 0, body: "body2", channel: c, from: 1})
       ])
 
+      Process.sleep(101)
+
       assert :ok ==
                GCChat.Message.build(%{chat_type: 0, body: "body3", channel: c, from: 1})
                |> BenchTest.Global.send()
 
-      Process.sleep(300)
-      assert [1, 2, 3] == BenchTest.Global.lookup(c, 0) |> Enum.map(& &1.id)
+      Process.sleep(101)
+
+      assert [{1, "body1"}, {2, "body2"}, {3, "body3"}] ==
+               BenchTest.Global.lookup(c, 0) |> Enum.map(&{&1.id, &1.body})
     end
   end
 

@@ -45,7 +45,7 @@ defmodule GCChat.MixProject do
       {:nimble_options, "~> 1.0"},
       {:benchee, "~> 1.1", only: [:dev, :test]},
       {:local_cluster, "~> 1.2", only: [:test]},
-      {:mix_test_watch, "~> 1.1", only: :dev, runtime: false}
+      {:mix_test_watch, "~> 1.1", only: [:test], runtime: false}
     ]
   end
 end

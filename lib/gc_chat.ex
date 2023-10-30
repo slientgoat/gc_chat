@@ -75,8 +75,8 @@ defmodule GCChat do
     |> Enum.reverse()
   end
 
-  def delete_entries(names, server_pool_size) do
-    names
+  def delete_entries(channel_names, server_pool_size) do
+    channel_names
     |> Enum.group_by(&GCChat.ServerManager.worker_for_channel(&1, server_pool_size))
     |> Enum.reduce([], fn {worker, list}, acc ->
       if is_pid(worker) do
@@ -100,6 +100,8 @@ defmodule GCChat do
 
       defdelegate build(attrs), to: GCChat.Message
 
+      def now(), do: System.os_time(:second)
+
       def send({:ok, %GCChat.Message{} = msg}) do
         send(msg)
       end
@@ -112,16 +114,16 @@ defmodule GCChat do
         {:error, error}
       end
 
-      def lookup(channel, last_id) do
-        GCChat.lookup(@cache_adapter, channel, last_id)
+      def lookup(channel_name, last_id) do
+        GCChat.lookup(@cache_adapter, channel_name, last_id)
       end
 
-      def newest_id(channel) do
-        GCChat.newest_id(@cache_adapter, channel)
+      def newest_id(channel_name) do
+        GCChat.newest_id(@cache_adapter, channel_name)
       end
 
-      def delete_channel(channel) do
-        GCChat.delete_entries([channel], get_server_pool_size())
+      def delete_entry(channel_name) do
+        GCChat.delete_entries([channel_name], get_server_pool_size())
       end
 
       def cache_adapter() do
@@ -226,6 +228,8 @@ defmodule GCChat do
       defp loop_garbage() do
         Process.send_after(self(), :loop_garbage, @submit_interval)
       end
+
+      defoverridable now: 0
     end
   end
 end
