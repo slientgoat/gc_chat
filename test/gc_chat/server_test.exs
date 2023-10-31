@@ -8,49 +8,56 @@ defmodule GCChat.ServerTest do
     setup [:create_server]
 
     test "write 10k msgs with uniq channel", %{state: %GCChat.Server{handler: handler} = state} do
+      entry_name = make_entry_name("uniq_10k")
+
       {:noreply, %GCChat.Server{entries: entries}} =
         GCChat.Server.handle_cast(
-          {:receive_msgs, make_uniq_channel_msgs("uniq_10k", 10000)},
+          {:receive_msgs, make_uniq_channel_msgs(entry_name, 10000)},
           state
         )
 
-      assert %Entry{name: "uniq_10k-1", cb: %CircularBuffer{count: 1} = cb, last_id: 1} =
-               entry = entries["uniq_10k-1"]
+      first_entry_name = "#{entry_name}-1"
+
+      assert %Entry{name: ^first_entry_name, cb: %CircularBuffer{count: 1} = cb, last_id: 1} =
+               entry = entries[first_entry_name]
 
       assert %GCChat.Entry.Message{id: 1} = CircularBuffer.oldest(cb)
       assert %GCChat.Entry.Message{id: 1} = CircularBuffer.newest(cb)
-      assert entry == cache_get(handler, "uniq_10k-1")
+      assert entry == cache_get(handler, first_entry_name)
+
+      last_entry_name = "#{entry_name}-10000"
 
       assert %Entry{
-               name: "uniq_10k-10000",
+               name: ^last_entry_name,
                cb: %CircularBuffer{count: 1} = cb2,
                last_id: 1
-             } = entry2 = entries["uniq_10k-10000"]
+             } = entry2 = entries[last_entry_name]
 
       assert %GCChat.Entry.Message{id: 1} = CircularBuffer.oldest(cb2)
       assert %GCChat.Entry.Message{id: 1} = CircularBuffer.newest(cb2)
-      assert entry2 == cache_get(handler, "uniq_10k-10000")
+      assert entry2 == cache_get(handler, last_entry_name)
     end
 
     test "write 10k msgs with same channel ", %{state: %GCChat.Server{handler: handler} = state} do
       num = 10000
       buffer_size = GCChat.Config.default_buffer_size()
       ttl = GCChat.Config.default_ttl()
+      entry_name = make_entry_name("same_10k")
 
       {:noreply, %GCChat.Server{entries: entries}} =
-        GCChat.Server.handle_cast({:receive_msgs, make_same_channel_msgs("same_10k", num)}, state)
+        GCChat.Server.handle_cast({:receive_msgs, make_same_channel_msgs(entry_name, num)}, state)
 
       assert %Entry{
-               name: "same_10k",
+               name: ^entry_name,
                last_id: 10000,
                ttl: ^ttl,
                cb: %CircularBuffer{count: ^buffer_size} = cb
-             } = entry = entries["same_10k"]
+             } = entry = entries[entry_name]
 
       oldest_id = num - buffer_size + 1
       assert %GCChat.Entry.Message{id: ^oldest_id} = CircularBuffer.oldest(cb)
       assert %GCChat.Entry.Message{id: ^num} = CircularBuffer.newest(cb)
-      assert entry == cache_get(handler, "same_10k")
+      assert entry == cache_get(handler, entry_name)
     end
   end
 
@@ -58,45 +65,39 @@ defmodule GCChat.ServerTest do
     setup [:create_server]
 
     test "delete_channel c1 after add c1", %{state: %GCChat.Server{handler: handler} = state} do
-      c = "#{System.unique_integer()}"
+      entry_name = make_entry_name("#{System.unique_integer()}")
+      state = add_channel_msgs(state, entry_name, 1)
+      assert %Entry{cb: %CircularBuffer{count: 1}} = entry = state.entries[entry_name]
+      assert entry == cache_get(handler, entry_name)
 
-      state = add_channel_msgs(state, c, 1)
-      assert %Entry{cb: %CircularBuffer{count: 1}} = entry = state.entries[c]
-      assert entry == cache_get(handler, c)
+      {:noreply, state} = GCChat.Server.handle_cast({:delete_entries, [entry_name]}, state)
 
-      {:noreply, state} = GCChat.Server.handle_cast({:delete_entries, [c]}, state)
-
-      assert nil == state.entries[c]
+      assert nil == state.entries[entry_name]
     end
   end
 
-  describe "BenchTest.Global.lookup/2" do
-    test "return [1,2,3] if the remote node1,node2 and local node will send a msg by each node node1 and node2 " do
-      c = "#{System.unique_integer()}"
-      [n1, n2 | _] = Node.list()
+  describe "fetch_entry/2" do
+    test "return nil if worker process is not exist" do
+      entry_name = make_entry_name("c1")
+      assert nil == GCChat.Server.fetch_entry(:no_worker, entry_name)
+    end
 
-      :rpc.block_call(n1, BenchTest.Global, :send, [
-        GCChat.Message.build(%{chat_type: 0, body: "body1", channel: c, from: 1})
-      ])
-
-      :rpc.block_call(n2, BenchTest.Global, :send, [
-        GCChat.Message.build(%{chat_type: 0, body: "body2", channel: c, from: 1})
-      ])
-
-      Process.sleep(101)
-
-      assert :ok ==
-               GCChat.Message.build(%{chat_type: 0, body: "body3", channel: c, from: 1})
-               |> BenchTest.Global.send()
-
-      Process.sleep(101)
-
-      assert [{1, "body1"}, {2, "body2"}, {3, "body3"}] ==
-               BenchTest.Global.lookup(c, 0) |> Enum.map(&{&1.id, &1.body})
+    test "return nil if worker process is exist but entry not exist" do
+      entry_name = make_entry_name("c1")
+      assert nil == GCChat.Server.fetch_entry(GCChat.Server.via_tuple(1), entry_name)
     end
   end
+
+  # test "add_new_msgs/2", %{state: state} do
+  #   add_msgs(state, {})
+  # end
 
   defp cache_get(handler, key) do
     handler.cache_adapter().get(key)
   end
+
+  # defp add_msgs(%GCChat.Server{} = state, channel, num \\ 1) do
+  #   entry_name = GCChat.Entry.encode_name(0, channel)
+  #   GCChat.Server.add_new_msgs(state, make_same_channel_msgs(entry_name, num))
+  # end
 end

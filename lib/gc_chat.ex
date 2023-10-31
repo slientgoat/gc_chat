@@ -38,15 +38,11 @@ defmodule GCChat do
   end
 
   def lookup(cache_adapter, channel_name, last_id) do
-    if entry = cache_adapter.get(channel_name) do
-      GCChat.Entry.take(entry, last_id)
-    else
-      []
-    end
+    cache_adapter.get(channel_name) |> GCChat.Entry.lookup(last_id)
   end
 
-  def newest_id(cache_adapter, channel_name) do
-    if entry = cache_adapter.get(channel_name) do
+  def newest_id(cache_adapter, entry_name) do
+    if entry = cache_adapter.get(entry_name) do
       GCChat.Entry.last_id(entry)
     else
       nil
@@ -55,7 +51,7 @@ defmodule GCChat do
 
   def group_msgs(msgs, server_pool_size) do
     msgs
-    |> Enum.group_by(&GCChat.ServerManager.worker_for_channel(&1.channel, server_pool_size))
+    |> Enum.group_by(&GCChat.ServerManager.choose_worker(&1.channel, server_pool_size))
   end
 
   def submit_msgs(grouped_msgs, batch_size) do
@@ -77,7 +73,7 @@ defmodule GCChat do
 
   def delete_entries(channel_names, server_pool_size) do
     channel_names
-    |> Enum.group_by(&GCChat.ServerManager.worker_for_channel(&1, server_pool_size))
+    |> Enum.group_by(&GCChat.ServerManager.choose_worker(&1, server_pool_size))
     |> Enum.reduce([], fn {worker, list}, acc ->
       if is_pid(worker) do
         GCChat.Server.delete_entries(worker, list)
@@ -91,6 +87,7 @@ defmodule GCChat do
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
       use GenServer
+      use Memoize
       @opts GCChat.parse_opts(opts)
       @persist Keyword.get(@opts, :persist)
       @persist_interval Keyword.get(@opts, :persist_interval)
@@ -99,6 +96,8 @@ defmodule GCChat do
       @cache_adapter Keyword.get(@opts, :cache_adapter)
 
       defdelegate build(attrs), to: GCChat.Message
+      defdelegate encode_entry_name(chat_type, tag), to: GCChat.Entry, as: :encode_name
+      defdelegate decode_entry_name(entry_name), to: GCChat.Entry, as: :decode_name
 
       def now(), do: System.os_time(:second)
 
@@ -114,16 +113,30 @@ defmodule GCChat do
         {:error, error}
       end
 
-      def lookup(channel_name, last_id) do
-        GCChat.lookup(@cache_adapter, channel_name, last_id)
+      def lookup(entry_name, last_id) do
+        GCChat.lookup(@cache_adapter, entry_name, last_id)
       end
 
-      def newest_id(channel_name) do
-        GCChat.newest_id(@cache_adapter, channel_name)
+      def lookup_from_memorize(entry_name, last_id) do
+        fetch_entry(entry_name)
+        |> GCChat.Entry.lookup(last_id)
       end
 
-      def delete_entry(channel_name) do
-        GCChat.delete_entries([channel_name], get_server_pool_size())
+      defmemo fetch_entry(entry_name) do
+        GCChat.ServerManager.choose_worker(entry_name, get_server_pool_size())
+        |> GCChat.Server.fetch_entry(entry_name)
+      end
+
+      def invalidate_fetch_entry_memo(entry_names) do
+        Enum.each(entry_names, &Memoize.invalidate(__MODULE__, :fetch_entry, [&1]))
+      end
+
+      def newest_id(entry_name) do
+        GCChat.newest_id(@cache_adapter, entry_name)
+      end
+
+      def delete_entry(entry_name) do
+        GCChat.delete_entries([entry_name], get_server_pool_size())
       end
 
       def cache_adapter() do
@@ -145,6 +158,10 @@ defmodule GCChat do
 
       def server() do
         GCChat.Server.pid(__MODULE__)
+      end
+
+      def nodes() do
+        :pg.get_members(GCChat, __MODULE__) |> Enum.map(&node/1)
       end
 
       def start_link(_) do
@@ -197,6 +214,7 @@ defmodule GCChat do
 
       @impl true
       def handle_continue(:initialize, msgs) do
+        :pg.join(GCChat, __MODULE__, self())
         loop_submit()
         {:noreply, msgs}
       end
@@ -223,10 +241,6 @@ defmodule GCChat do
 
       defp loop_submit() do
         Process.send_after(self(), :loop_submit, @submit_interval)
-      end
-
-      defp loop_garbage() do
-        Process.send_after(self(), :loop_garbage, @submit_interval)
       end
 
       defoverridable now: 0

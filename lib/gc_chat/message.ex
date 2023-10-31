@@ -2,7 +2,7 @@ defmodule GCChat.Message do
   use Ecto.Schema
   import Ecto.Changeset
   alias GCChat.Message, as: M
-  @type channel :: String.t()
+
   schema "chat_message" do
     field(:chat_type, :integer)
     field(:channel, :string)

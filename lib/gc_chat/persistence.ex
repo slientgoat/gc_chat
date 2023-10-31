@@ -1,7 +1,7 @@
 defmodule GcChat.Adapter.Persistence do
-  @callback dump([%GCChat.Message{}]) :: :ok | {:error, term}
+  @callback dump(GCChat.Entry.entries()) :: :ok | {:error, term}
 
-  @callback load() :: :ok | {:error, term}
+  # @callback get_from_db(GCChat.Entry.name()) :: :ok | {:error, term}
 
   alias Nebulex.Entry
 

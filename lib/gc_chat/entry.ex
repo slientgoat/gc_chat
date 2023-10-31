@@ -6,17 +6,18 @@ defmodule GCChat.Entry do
             touched_at: nil,
             updated_at: nil,
             created_at: nil,
-            enable_persist: false
+            persist_at: nil
 
+  @type name :: String.t()
   @type t :: %__MODULE__{
-          name: GCChat.Message.channel(),
+          name: name(),
           cb: CircularBuffer.t(),
           last_id: non_neg_integer(),
           ttl: non_neg_integer(),
           touched_at: non_neg_integer(),
           updated_at: non_neg_integer(),
           created_at: non_neg_integer(),
-          enable_persist: boolean()
+          persist_at: non_neg_integer()
         }
 
   defmodule Message do
@@ -26,8 +27,27 @@ defmodule GCChat.Entry do
               send_at: nil
   end
 
-  @type entries :: %{GCChat.Message.channel() => t()}
+  @type entries :: %{name() => t()}
   alias __MODULE__, as: M
+
+  def encode_name(chat_type, channel) do
+    "#{chat_type}|#{channel}"
+  end
+
+  def decode_name(entry_name) do
+    [chat_type, channel | _] = String.split(entry_name, "|")
+    {String.to_integer(chat_type), channel}
+  end
+
+  def lookup(entry, last_id) do
+    case entry do
+      %M{} = e ->
+        take(e, last_id)
+
+      _ ->
+        []
+    end
+  end
 
   def take(%M{cb: cb}, last_id) when is_integer(last_id) and last_id >= 0 do
     n = CircularBuffer.newest(cb)
@@ -54,7 +74,7 @@ defmodule GCChat.Entry do
   end
 
   def new(
-        name,
+        entry_name,
         now,
         %GCChat.Config{buffer_size: buffer_size, ttl: ttl} = config
       ) do
@@ -62,20 +82,40 @@ defmodule GCChat.Entry do
     enable_persist = GCChat.Config.enable_persist?(config)
 
     %M{
-      name: name,
+      name: entry_name,
       cb: cb,
       ttl: ttl,
       touched_at: now,
       updated_at: now,
       created_at: now,
-      enable_persist: enable_persist
+      persist_at: init_persist_at(enable_persist, now)
     }
+  end
+
+  def init_persist_at(enable_persist, now) do
+    if enable_persist do
+      now
+    else
+      nil
+    end
   end
 
   def update_cb(entry, cb), do: %M{entry | cb: cb}
   def update_last_id(entry, last_id), do: %M{entry | last_id: last_id}
   def update_updated_at(entry, updated_at), do: %M{entry | updated_at: updated_at}
   def update_touched_at(entry, touched_at), do: %M{entry | touched_at: touched_at}
+  def update_persist_at(entry, persist_at), do: %M{entry | persist_at: persist_at}
+
+  @spec find_expired_entry_names(entries(), non_neg_integer()) :: [name()]
+  def find_expired_entry_names(entries, now) do
+    Enum.reduce(entries, [], fn {_, %M{name: name} = x}, acc ->
+      if expired?(x, now) do
+        [name | acc]
+      else
+        acc
+      end
+    end)
+  end
 
   def expired?(%M{ttl: :infinity}, _now) do
     false
@@ -94,7 +134,18 @@ defmodule GCChat.Entry do
     end
   end
 
-  def persist?(%M{enable_persist: enable_persist}) do
-    enable_persist
+  @spec find_persist_entry_names(entries()) :: [name()]
+  def find_persist_entry_names(entries) do
+    Enum.reduce(entries, [], fn {_, %M{name: name} = x}, acc ->
+      if persist?(x) do
+        [name | acc]
+      else
+        acc
+      end
+    end)
   end
+
+  def persist?(%M{persist_at: nil}), do: false
+
+  def persist?(%M{persist_at: persist_at, updated_at: updated_at}), do: updated_at > persist_at
 end

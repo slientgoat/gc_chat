@@ -18,7 +18,7 @@ defmodule GCChat.EntryTest do
                touched_at: ^now,
                updated_at: ^now,
                created_at: ^now,
-               enable_persist: false
+               persist_at: nil
              } = entry
 
       assert %CircularBuffer{max_size: ^default_buffer_size, count: 0} = cb
@@ -29,6 +29,8 @@ defmodule GCChat.EntryTest do
       config = GCChat.Config.default() |> Map.put(:persist_interval, :timer.seconds(1))
       entry = Entry.new("test1", now, config)
 
+      assert false == Entry.persist?(entry)
+      entry = Entry.update_updated_at(entry, now + 1)
       assert true == Entry.persist?(entry)
     end
   end

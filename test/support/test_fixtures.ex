@@ -1,10 +1,14 @@
 defmodule GCChat.TestFixtures do
-  def make_uniq_channel_msgs(channel_prfix, num, chat_type \\ 0) do
-    fn x -> "#{channel_prfix}-#{x}" end
+  def make_uniq_channel_msgs(entry_name, num) do
+    {chat_type, channel} = GCChat.Entry.decode_name(entry_name)
+
+    fn x -> "#{channel}-#{x}" end
     |> make_channel_msgs(num, chat_type)
   end
 
-  def make_same_channel_msgs(channel, num, chat_type \\ 0) do
+  def make_same_channel_msgs(entry_name, num) do
+    {chat_type, channel} = GCChat.Entry.decode_name(entry_name)
+
     fn _x -> channel end
     |> make_channel_msgs(num, chat_type)
   end
@@ -39,15 +43,22 @@ defmodule GCChat.TestFixtures do
     end
   end
 
-  def add_channel_msgs(channel, num) do
+  def add_channel_msgs(entry_name, num) do
     %{state: state} = create_server()
-    add_channel_msgs(state, channel, num)
+    add_channel_msgs(state, entry_name, num)
   end
 
-  def add_channel_msgs(state, channel, num) do
+  def add_channel_msgs(state, entry_name, num) do
     {:noreply, state} =
-      GCChat.Server.handle_cast({:receive_msgs, make_same_channel_msgs(channel, num)}, state)
+      GCChat.Server.handle_cast(
+        {:receive_msgs, make_same_channel_msgs(entry_name, num)},
+        state
+      )
 
     state
+  end
+
+  def make_entry_name(channel, chat_type \\ 0) do
+    GCChat.Entry.encode_name(chat_type, channel)
   end
 end

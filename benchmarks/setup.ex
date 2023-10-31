@@ -12,6 +12,7 @@ defmodule BenchTestApplication do
     opts = [strategy: :one_for_one, name: BenchTestApplication.Supervisor]
     # Supervisor.start_link(, opts)
     children = [
+      %{id: :pg, start: {:pg, :start_link, [GCChat]}},
       {Horde.Registry, [name: GCChat.GlobalRegistry, keys: :unique, members: :auto]},
       {
         Horde.DynamicSupervisor,

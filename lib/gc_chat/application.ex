@@ -12,6 +12,7 @@ defmodule GCChat.Application do
     opts = [strategy: :one_for_one, name: GCChat.Supervisor]
 
     children = [
+      %{id: :pg, start: {:pg, :start_link, [GCChat]}},
       {Horde.Registry, [name: GCChat.GlobalRegistry, keys: :unique, members: :auto]},
       {
         Horde.DynamicSupervisor,

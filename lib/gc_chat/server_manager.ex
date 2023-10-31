@@ -3,7 +3,7 @@ defmodule GCChat.ServerManager do
   require Logger
   defstruct pool_size: nil, instance: nil
 
-  def worker_for_channel(channel, pool_size) do
+  def choose_worker(channel, pool_size) do
     :erlang.phash2(channel, pool_size)
     |> GCChat.Server.via_tuple()
   end

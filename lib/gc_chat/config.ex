@@ -16,6 +16,10 @@ defmodule GCChat.Config do
     runtime_config() |> Map.get(chat_type, default())
   end
 
+  def enable_persist?(chat_type) when is_integer(chat_type) do
+    enable_persist?(runtime_config(chat_type))
+  end
+
   def enable_persist?(%__MODULE__{persist_interval: persist_interval}) do
     if persist_interval != nil and persist_interval >= 0 do
       true
