@@ -1,7 +1,7 @@
 defmodule GCChat.Server do
   use GenServer
   @persist_interval 60
-  defstruct entries: %{}, handler: nil, persist_interval: @persist_interval
+  defstruct id: nil, entries: %{}, handler: nil, persist_interval: @persist_interval
 
   require Logger
   alias __MODULE__, as: M
@@ -47,7 +47,8 @@ defmodule GCChat.Server do
     id = Keyword.get(opts, :id)
     :yes = :global.re_register_name(worker_name(id), self())
 
-    {:ok, %M{handler: handler, persist_interval: persist_interval}, {:continue, :initialize}}
+    {:ok, %M{id: id, handler: handler, persist_interval: persist_interval},
+     {:continue, :initialize}}
   end
 
   def pid(id) do
@@ -104,7 +105,7 @@ defmodule GCChat.Server do
   def maybe_get_entry_from_db(handler, entry_name) do
     with {chat_type, _} <- GCChat.Entry.decode_name(entry_name),
          true <- GCChat.Config.enable_persist?(chat_type),
-         {:ok, entry} <- handler.get_from_db(handler, entry_name) do
+         {:ok, entry} <- exec_callback(handler, :get_from_db, [entry_name]) do
       entry
     else
       _ ->
@@ -201,10 +202,11 @@ defmodule GCChat.Server do
     state
   end
 
-  defp do_persist_entries(%M{entries: entries, handler: handler} = state, entry_names) do
+  defp do_persist_entries(%M{id: id, entries: entries, handler: handler} = state, entry_names) do
     now = handler.now()
     persist_entries = Map.take(entries, entry_names)
-    handler.dump(persist_entries)
+
+    exec_callback(handler, :dump, [id, persist_entries])
 
     entries =
       Enum.reduce(persist_entries, %{}, fn {k, v}, acc ->
@@ -213,5 +215,15 @@ defmodule GCChat.Server do
       |> then(&Map.merge(entries, &1))
 
     %{state | entries: entries}
+  end
+
+  defp exec_callback(handler, fun, args) do
+    try do
+      apply(handler, fun, args)
+    rescue
+      error ->
+        Logger.error(exec_callback_fail: error)
+        {:error, error}
+    end
   end
 end

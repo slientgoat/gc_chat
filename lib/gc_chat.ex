@@ -84,22 +84,26 @@ defmodule GCChat do
     end)
   end
 
+  @callback now() :: integer()
+  @callback dump(id :: integer(), entries :: GCChat.Entry.entries()) :: :ok
+  @callback get_from_db(GCChat.Entry.name()) :: {:ok, nil | GCChat.Entry.t()}
+
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
       use GenServer
       use Memoize
+      @behaviour GCChat
       @opts GCChat.parse_opts(opts)
       @persist Keyword.get(@opts, :persist)
       @persist_interval Keyword.get(@opts, :persist_interval)
       @batch_size Keyword.get(@opts, :batch_size)
       @submit_interval Keyword.get(@opts, :submit_interval)
       @cache_adapter Keyword.get(@opts, :cache_adapter)
+      @otp_app Keyword.get(@opts, :otp_app)
 
       defdelegate build(attrs), to: GCChat.Message
       defdelegate encode_entry_name(chat_type, tag), to: GCChat.Entry, as: :encode_name
       defdelegate decode_entry_name(entry_name), to: GCChat.Entry, as: :decode_name
-
-      def now(), do: System.os_time(:second)
 
       def send({:ok, %GCChat.Message{} = msg}) do
         send(msg)
@@ -243,7 +247,16 @@ defmodule GCChat do
         Process.send_after(self(), :loop_submit, @submit_interval)
       end
 
-      defoverridable now: 0
+      @impl true
+      def now(), do: System.os_time(:second)
+
+      @impl true
+      def dump(_worker_id, _entries), do: :ok
+
+      @impl true
+      def get_from_db(entry_name), do: {:ok, nil}
+
+      defoverridable now: 0, dump: 2, get_from_db: 1
     end
   end
 end
