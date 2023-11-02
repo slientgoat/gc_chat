@@ -29,8 +29,7 @@ defmodule GCChat.TestFixtures do
   end
 
   def create_server(_args \\ []) do
-    {:ok, state, {:continue, continue}} = GCChat.Server.init(instance: BenchTest.Global)
-    {:noreply, state} = GCChat.Server.handle_continue(continue, state)
+    state = MyApp.Server.handle_init(%{id: 1}) |> MyApp.Server.handle_continue()
     %{state: state}
   end
 
@@ -41,21 +40,6 @@ defmodule GCChat.TestFixtures do
       Process.sleep(100)
       wait_for_server_started(f_pid)
     end
-  end
-
-  def add_channel_msgs(entry_name, num) do
-    %{state: state} = create_server()
-    add_channel_msgs(state, entry_name, num)
-  end
-
-  def add_channel_msgs(state, entry_name, num) do
-    {:noreply, state} =
-      GCChat.Server.handle_cast(
-        {:receive_msgs, make_same_channel_msgs(entry_name, num)},
-        state
-      )
-
-    state
   end
 
   def make_entry_name(channel, chat_type \\ 0) do

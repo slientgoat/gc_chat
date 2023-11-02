@@ -76,10 +76,9 @@ defmodule GCChat.Entry do
   def new(
         entry_name,
         now,
-        %GCChat.Config{buffer_size: buffer_size, ttl: ttl} = config
+        %GCChat.Config{buffer_size: buffer_size, ttl: ttl, enable_persist: enable_persist}
       ) do
     cb = CircularBuffer.new(buffer_size)
-    enable_persist = GCChat.Config.enable_persist?(config)
 
     %M{
       name: entry_name,

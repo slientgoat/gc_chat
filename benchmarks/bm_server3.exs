@@ -1,5 +1,6 @@
 instance = BenchTest.Global
-GCChat.TestFixtures.add_channel_msgs("Replicated", 1000)
+
+# GCChat.TestFixtures.add_channel_msgs("Replicated", 1000)
 
 Benchee.run(
   %{

@@ -17,14 +17,13 @@ defmodule GCChat.MixProject do
   if Mix.env() == :test do
     def application do
       [
-        mod: {BenchTestApplication, []}
+        mod: {MyApp.Application, []},
+        extra_applications: [:runtime_tools, :observer, :wx]
       ]
     end
   else
     def application do
-      [
-        mod: {GCChat.Application, []}
-      ]
+      []
     end
   end
 
@@ -34,10 +33,11 @@ defmodule GCChat.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      {:libcluster, "~> 3.3", only: [:dev, :test]},
       {:ecto, "~> 3.10.0"},
       {:enum_type, "~> 1.1.0"},
       {:circular_buffer, "~> 0.4.1"},
-      {:horde, "~> 0.8.7"},
+      {:easy_horde, git: "http://192.168.15.11:9000/game_public/easy_horde.git", only: [:test]},
       {:nebulex, "~> 2.5"},
       {:shards, "~> 1.0"},
       {:decorator, "~> 1.4"},

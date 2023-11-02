@@ -1,5 +1,5 @@
 defmodule GCChat.Config do
-  defstruct persist_interval: nil, ttl: 86400, buffer_size: 1000
+  defstruct enable_persist: false, ttl: 86400, buffer_size: 1000
 
   def default() do
     %__MODULE__{}
@@ -20,8 +20,8 @@ defmodule GCChat.Config do
     enable_persist?(runtime_config(chat_type))
   end
 
-  def enable_persist?(%__MODULE__{persist_interval: persist_interval}) do
-    if persist_interval != nil and persist_interval >= 0 do
+  def enable_persist?(%__MODULE__{enable_persist: enable_persist}) do
+    if enable_persist == true do
       true
     else
       false

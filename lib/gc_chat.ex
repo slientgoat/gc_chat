@@ -1,34 +1,19 @@
 defmodule GCChat do
   @opts_schema [
-    persist: [
-      type: :boolean,
-      doc: "persist data to local node disk after application stop and persist_interval",
-      default: false
-    ],
-    persist_interval: [
-      type: :non_neg_integer,
-      doc: "persist data for every [persist_interval] seconds",
-      default: 60
+    server: [
+      type: :atom,
+      doc: "the process that use easy_horde",
+      required: true
     ],
     batch_size: [
       type: {:in, 1..10000},
       doc: "submit max [batch_size] msgs to server per time",
       default: 200
     ],
-    server_pool_size: [
-      type: :non_neg_integer,
-      doc: "the pool size of server worker. default: System.schedulers_online()"
-    ],
     submit_interval: [
       type: {:in, 10..3000},
       doc: "submit msgs to the server per [submit_interval] ms",
       default: 100
-    ],
-    cache_adapter: [
-      type: :atom,
-      doc: "where msgs to cache",
-      default: GCChat.LocalCache,
-      required: true
     ]
   ]
 
@@ -37,121 +22,78 @@ defmodule GCChat do
     default
   end
 
-  def lookup(cache_adapter, channel_name, last_id) do
-    cache_adapter.get(channel_name) |> GCChat.Entry.lookup(last_id)
-  end
-
-  def newest_id(cache_adapter, entry_name) do
-    if entry = cache_adapter.get(entry_name) do
-      GCChat.Entry.last_id(entry)
-    else
-      nil
-    end
-  end
-
-  def group_msgs(msgs, server_pool_size) do
-    msgs
-    |> Enum.group_by(&GCChat.ServerManager.choose_worker(&1.channel, server_pool_size))
-  end
-
-  def submit_msgs(grouped_msgs, batch_size) do
-    grouped_msgs
-    |> Enum.reduce([], fn {worker, list}, acc ->
-      if is_pid(GenServer.whereis(worker)) do
-        list
+  def submit_msgs(buffers, server, batch_size) do
+    buffers
+    |> Enum.reduce(%{}, fn {entry_name, msgs}, acc ->
+      if is_pid(server.pick_worker(entry_name)) do
+        msgs
         |> Enum.reverse()
         |> Enum.chunk_every(batch_size)
-        |> Enum.each(&GCChat.Server.send(worker, &1))
+        |> Enum.each(
+          &(GCChat.Server.send(server, entry_name, &1)
+            |> IO.inspect(label: "submit_result"))
+        )
 
         acc
       else
-        Enum.reverse(list) ++ acc
-      end
-    end)
-    |> Enum.reverse()
-  end
-
-  def delete_entries(channel_names, server_pool_size) do
-    channel_names
-    |> Enum.group_by(&GCChat.ServerManager.choose_worker(&1, server_pool_size))
-    |> Enum.reduce([], fn {worker, list}, acc ->
-      if is_pid(worker) do
-        GCChat.Server.delete_entries(worker, list)
-        acc
-      else
-        list ++ acc
+        Map.put(acc, entry_name, msgs)
       end
     end)
   end
 
   @callback now() :: integer()
-  @callback dump(id :: integer(), entries :: GCChat.Entry.entries()) :: :ok
-  @callback get_from_db(GCChat.Entry.name()) :: {:ok, nil | GCChat.Entry.t()}
 
   defmacro __using__(opts) do
-    quote bind_quoted: [opts: opts] do
+    quote location: :keep, bind_quoted: [opts: opts] do
       use GenServer
-      use Memoize
       @behaviour GCChat
       @opts GCChat.parse_opts(opts)
-      @persist Keyword.get(@opts, :persist)
-      @persist_interval Keyword.get(@opts, :persist_interval)
+      @server Keyword.get(@opts, :server)
+      @server_registry Module.concat(@server, Registry)
+      @otp_app Keyword.get(@opts, :otp_app)
       @batch_size Keyword.get(@opts, :batch_size)
       @submit_interval Keyword.get(@opts, :submit_interval)
-      @cache_adapter Keyword.get(@opts, :cache_adapter)
-      @otp_app Keyword.get(@opts, :otp_app)
 
       defdelegate build(attrs), to: GCChat.Message
       defdelegate encode_entry_name(chat_type, tag), to: GCChat.Entry, as: :encode_name
       defdelegate decode_entry_name(entry_name), to: GCChat.Entry, as: :decode_name
+
+      def opts(), do: @opts
 
       def send({:ok, %GCChat.Message{} = msg}) do
         send(msg)
       end
 
       def send(%GCChat.Message{} = msg) do
+        IO.inspect("88")
         cast({:send, msg})
       end
 
       def send(error) do
+        IO.inspect("66")
         {:error, error}
       end
 
       def lookup(entry_name, last_id) do
-        GCChat.lookup(@cache_adapter, entry_name, last_id)
-      end
-
-      def lookup_from_memorize(entry_name, last_id) do
         fetch_entry(entry_name)
         |> GCChat.Entry.lookup(last_id)
       end
 
-      defmemo fetch_entry(entry_name) do
-        GCChat.ServerManager.choose_worker(entry_name, get_server_pool_size())
-        |> GCChat.Server.fetch_entry(entry_name)
+      def fetch_entry(entry_name) do
+        @server.fetch_entry(entry_name)
       end
 
-      def invalidate_fetch_entry_memo(entry_names) do
-        Enum.each(entry_names, &Memoize.invalidate(__MODULE__, :fetch_entry, [&1]))
+      def fetch_newest_id(entry_name) do
+        if entry = fetch_entry(entry_name) do
+          GCChat.Entry.last_id(entry)
+        else
+          nil
+        end
       end
 
-      def newest_id(entry_name) do
-        GCChat.newest_id(@cache_adapter, entry_name)
-      end
+      defp cast(event) do
+        IO.inspect("99")
 
-      def delete_entry(entry_name) do
-        GCChat.delete_entries([entry_name], get_server_pool_size())
-      end
-
-      def cache_adapter() do
-        @cache_adapter
-      end
-
-      def pid() do
-        __MODULE__ |> GenServer.whereis()
-      end
-
-      def cast(event) do
         if pid = pid() do
           GenServer.cast(pid, event)
           :ok
@@ -160,8 +102,8 @@ defmodule GCChat do
         end
       end
 
-      def server() do
-        GCChat.Server.pid(__MODULE__)
+      defp pid() do
+        __MODULE__ |> GenServer.whereis()
       end
 
       def nodes() do
@@ -174,73 +116,50 @@ defmodule GCChat do
 
       @impl true
       def init(_) do
-        opts = Keyword.put(@opts, :instance, __MODULE__)
-
-        with true <- supervisor_started?() || {:error, :superviso_not_started},
-             {:ok, pid} <- start_global_service({GCChat.ServerManager, opts}) do
-          GCChat.ServerManager.pool_size(pid)
-          |> put_server_pool_size()
-
-          {:ok, [], {:continue, :initialize}}
-        else
-          {:error, error} ->
-            {:stop, error}
-        end
-      end
-
-      def supervisor_started?() do
-        GCChat.DistributedSupervisor |> GenServer.whereis() |> is_pid()
-      end
-
-      defp start_global_service({mod, _} = child_spec) do
-        case Horde.DynamicSupervisor.start_child(GCChat.DistributedSupervisor, child_spec) do
-          {:ok, pid} ->
-            {:ok, pid}
-
-          {:error, {:already_started, pid}} ->
-            {:ok, pid}
-
-          :ignore ->
-            {:ok, mod.pid()}
-
-          {:error, error} ->
-            {:error, error}
-        end
-      end
-
-      def put_server_pool_size(server_pool_size) do
-        :persistent_term.put({__MODULE__, :server_pool_size}, server_pool_size)
-      end
-
-      def get_server_pool_size() do
-        :persistent_term.get({__MODULE__, :server_pool_size})
+        {:ok, %{}, {:continue, :initialize}}
       end
 
       @impl true
       def handle_continue(:initialize, msgs) do
-        :pg.join(GCChat, __MODULE__, self())
+        wait_server_ready()
+        :ok = @server.subscribe(self())
         loop_submit()
         {:noreply, msgs}
       end
 
-      @impl true
-      def handle_info(:loop_submit, []) do
-        loop_submit()
-        {:noreply, []}
+      defp wait_server_ready() do
+        if @server.all_ready?() do
+          :ok
+        else
+          Process.sleep(100)
+          wait_server_ready()
+        end
       end
 
-      def handle_info(:loop_submit, msgs) do
-        rest =
-          GCChat.group_msgs(msgs, get_server_pool_size())
-          |> GCChat.submit_msgs(@batch_size)
+      @impl true
+      def handle_info(:loop_submit, buffers) do
+        rest = GCChat.submit_msgs(buffers, @server, @batch_size)
 
         loop_submit()
         {:noreply, rest}
       end
 
       @impl true
-      def handle_cast({:send, msg}, msgs) do
-        {:noreply, [msg | msgs]}
+      def handle_cast({:send, msg}, buffers) do
+        IO.inspect(msg, label: :push_into_buffers)
+        {:noreply, push_into_buffers(buffers, msg)}
+      end
+
+      defp push_into_buffers(buffers, %GCChat.Message{} = msg) do
+        entry_name = GCChat.Server.to_entry_name(msg)
+
+        case Map.get(buffers, entry_name, nil) do
+          nil ->
+            Map.put(buffers, entry_name, [msg])
+
+          msgs ->
+            Map.put(buffers, entry_name, [msg | msgs])
+        end
       end
 
       defp loop_submit() do
@@ -250,13 +169,7 @@ defmodule GCChat do
       @impl true
       def now(), do: System.os_time(:second)
 
-      @impl true
-      def dump(_worker_id, _entries), do: :ok
-
-      @impl true
-      def get_from_db(entry_name), do: {:ok, nil}
-
-      defoverridable now: 0, dump: 2, get_from_db: 1
+      defoverridable now: 0
     end
   end
 end

@@ -26,11 +26,12 @@ defmodule GCChat.EntryTest do
 
     test "with a persist_at attr" do
       now = System.os_time(:second)
-      config = GCChat.Config.default() |> Map.put(:persist_interval, :timer.seconds(1))
+      config = GCChat.Config.default() |> Map.put(:enable_persist, true)
       entry = Entry.new("test1", now, config)
 
       assert false == Entry.persist?(entry)
       entry = Entry.update_updated_at(entry, now + 1)
+      IO.inspect(entry)
       assert true == Entry.persist?(entry)
     end
   end
